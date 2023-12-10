@@ -1,4 +1,4 @@
-from jitcdde import y, t
+from jitcdde import jitcdde, y, t
 import numpy as np
 
 class Node:
@@ -18,6 +18,7 @@ class Node:
         self.dcdt = 0.0
         self.drdt = 0.0
         self.y = None           # temperature (K), to be assigned by System class
+        self.solution = []      # solution data, can be populated by solve method
     
     def set_dTdt_bulkFlow(self, source):
         '''
@@ -117,3 +118,18 @@ class System:
                 self.nNodes += 1
                 index += 1
           return None
+     
+     def solve(self, T):
+          DDE = jitcdde([N.dydt() for N in self.nodes])
+          DDE.constant_past([N.y0 for N in self.nodes])
+          y = []
+
+          # integrate 
+          for t_x in T:
+               y.append(DDE.integrate(t_x))
+          
+          # populate node objects with respective solutions
+          for s in enumerate(self.nodes):
+               s[1].solution = [state[s[0]] for state in y]
+
+          return y
