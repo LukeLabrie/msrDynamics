@@ -47,7 +47,6 @@ Nodes are added to the `System` object which takes care of instantiation and ind
 JiTCDDE backend. 
 
 ```python
-# populate system 
 MSR.addNodes([cf_in,cf_out,cm,n,C1,C2,C3,C4,C5,C6,rho,
               hx_p_in,hx_p_out,hx_t,hx_s_in,hx_s_out])
 ```
@@ -96,10 +95,20 @@ hx_s_out.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ht_hx])
 Note, nodes can represent thermal masses as well as parameters related to point-kinetics. Now the system can be solved. 
 
 ```python
-# solve
 sol_jit = MSR.solve(T)
 ```
 
 Results for the above system are shown below. 
 
 ![msr_diagram](toyPlot.png)
+
+Solutions can be accessed from the `solution` attribute of the associated node. The snippet below is used for the plot above. 
+
+```python
+# P
+axs[0].plot(T, [k*P for k in n.solution])
+axs[0].set_xlim(t0,tf)
+axs[0].set_title("Power (MW)")
+axs[0].set_xlabel(r"$t$ (s)")
+axs[0].set_ylabel("MW")
+```

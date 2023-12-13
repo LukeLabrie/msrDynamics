@@ -117,9 +117,8 @@ class System:
                 self.nodes.append(n)
                 self.nNodes += 1
                 index += 1
-          return None
      
-     def solve(self, T):
+     def solve(self, T: list):
           DDE = jitcdde([N.dydt() for N in self.nodes])
           DDE.constant_past([N.y0 for N in self.nodes])
           y = []
@@ -131,5 +130,3 @@ class System:
           # populate node objects with respective solutions
           for s in enumerate(self.nodes):
                s[1].solution = [state[s[0]] for state in y]
-
-          return y
