@@ -1,5 +1,47 @@
-from jitcdde import jitcdde, y, t
+from jitcdde import jitcdde, y, t, jitcdde_input
 import numpy as np
+
+class System:
+     '''
+     Stores and operates on the system defined by a set of nodes
+     '''
+     def __init__(self, inputs: list = []) -> None:
+          self.inputs = inputs
+          self.n_nodes = 0
+          self.nodes = []
+          self.integrator = None
+
+     def add_nodes(self, new_nodes: list):
+          '''
+          Assigns state variable object y(), with unique index for each node, 
+          and initializaes the JiTCDDE integrator
+          new_nodes:
+          '''
+          index = self.n_nodes
+          for n in new_nodes: 
+                n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
+                self.nodes.append(n)
+                self.nNodes += 1
+                index += 1
+
+     def integrator(self, inputs):
+
+          # continue here with variable renameing and integrator method 
+
+          if (inputs):
+               DDE = jitcdde_input([N.dTdt_bulk_flow + N.dTdt_internal + N.dTdt_convective + N.dndt + N.dcdt + N.drdt for N in self.nodes],)
+
+     
+     def solve(self, T: list):
+          y = []
+
+          # integrate 
+          for t_x in T:
+               y.append(DDE.integrate(t_x))
+          
+          # populate node objects with respective solutions
+          for s in enumerate(self.nodes):
+               s[1].solution = [state[s[0]] for state in y]
 
 class Node:
     def __init__(self,
@@ -11,7 +53,7 @@ class Node:
         self.scp = scp          # specific heat capacity (J/(kg*K))
         self.W = W              # mass flow rate (kg/s)
         self.y0 = y0            # initial temperature (K)
-        self.BulkFlow = 0.0
+        self.dTdt_bulk_flow = 0.0
         self.internal = 0.0
         self.convective = 0.0
         self.dndt = 0.0
@@ -27,7 +69,7 @@ class Node:
         dumped: if 'from node' is a constant (indicates dumping instead of 
                 recirculation), this needs to be set to true
         '''
-        self.BulkFlow = (source-self.y())*self.W/self.m
+        self.dTdt_bulk_flow = (source-self.y())*self.W/self.m
  
 
     def set_dTdt_internal(self, source: callable, k: float):
@@ -105,28 +147,3 @@ class Node:
           sum = y1 + y2 + y3 + y4 + y5 + y6
           return sum
 
-class System:
-     def __init__(self) -> None:
-          self.nNodes = 0
-          self.nodes = []
-
-     def addNodes(self, newNodes: list):
-          index = self.nNodes
-          for n in newNodes: 
-                n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
-                self.nodes.append(n)
-                self.nNodes += 1
-                index += 1
-     
-     def solve(self, T: list):
-          DDE = jitcdde([N.dydt() for N in self.nodes])
-          DDE.constant_past([N.y0 for N in self.nodes])
-          y = []
-
-          # integrate 
-          for t_x in T:
-               y.append(DDE.integrate(t_x))
-          
-          # populate node objects with respective solutions
-          for s in enumerate(self.nodes):
-               s[1].solution = [state[s[0]] for state in y]
