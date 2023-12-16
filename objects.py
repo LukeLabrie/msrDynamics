@@ -1,16 +1,24 @@
-from jitcdde import jitcdde, y, t, jitcdde_input
+from jitcdde import jitcdde, y, t, jitcdde_input, input
 import numpy as np
+from chspy import CubicHermiteSpline
 
 class System:
      '''
      Stores and operates on the system defined by a set of nodes
      '''
-     def __init__(self, inputs: list = []) -> None:
-          self.inputs = inputs
+     def __init__(self, nodes: list = []) -> None:
           self.n_nodes = 0
-          self.nodes = []
+          self.nodes = nodes
           self.integrator = None
-
+          self.input = None 
+          return None
+     
+     def add_input(self, input_func, T):
+          spline = CubicHermiteSpline(n=1)
+          spline.from_function(input_func, times_of_interest = T)
+          self.input = spline
+          return input(0)
+     
      def add_nodes(self, new_nodes: list):
           '''
           Assigns state variable object y(), with unique index for each node, 
@@ -21,27 +29,35 @@ class System:
           for n in new_nodes: 
                 n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
                 self.nodes.append(n)
-                self.nNodes += 1
+                self.n_nodes += 1
                 index += 1
+          return self.nodes
 
-     def integrator(self, inputs):
-
-          # continue here with variable renameing and integrator method 
-
-          if (inputs):
-               DDE = jitcdde_input([N.dTdt_bulk_flow + N.dTdt_internal + N.dTdt_convective + N.dndt + N.dcdt + N.drdt for N in self.nodes],)
-
-     
      def solve(self, T: list):
-          y = []
 
-          # integrate 
+          # initialize JiTCDDE integrator
+          if (self.input):
+               dydt = [N.dydt() for N in self.nodes]
+               Y0 = [N.y0 for N in self.nodes]
+               DDE = jitcdde_input(dydt,self.input)
+               DDE.constant_past(Y0)
+               self.integrator = DDE
+          else:
+               dydt = [N.dydt() for N in self.nodes]
+               Y0 = [N.y0 for N in self.nodes]
+               DDE = jitcdde(dydt)
+               DDE.constant_past(Y0)
+               self.integrator = DDE
+
+          # solution 
+          y = []
+          # integrate
           for t_x in T:
-               y.append(DDE.integrate(t_x))
-          
-          # populate node objects with respective solutions
+               y.append(self.integrator.integrate(t_x))
+          # populate node objects with solutions 
           for s in enumerate(self.nodes):
                s[1].solution = [state[s[0]] for state in y]
+          return y
 
 class Node:
     def __init__(self,
@@ -54,8 +70,8 @@ class Node:
         self.W = W              # mass flow rate (kg/s)
         self.y0 = y0            # initial temperature (K)
         self.dTdt_bulk_flow = 0.0
-        self.internal = 0.0
-        self.convective = 0.0
+        self.dTdt_internal = 0.0
+        self.dTdt_convective = 0.0
         self.dndt = 0.0
         self.dcdt = 0.0
         self.drdt = 0.0
@@ -78,7 +94,7 @@ class Node:
         source: source of generation (state variable y(i))
         k: constant of proportionality 
         '''
-        self.internal = k*source
+        self.dTdt_internal = k*source
     
 
     def set_dTdt_convective(self, source: list, hA: list):
@@ -88,7 +104,7 @@ class Node:
         hA_mcp: ratio of [convective heat transfer coefficient(s) * wetted area(s) (MW/C)]
         '''
         for i in range(len(source)):
-                self.convective += hA[i]*(source[i]-self.y())/(self.m*self.scp)
+                self.dTdt_convective += hA[i]*(source[i]-self.y())/(self.m*self.scp)
     
     def set_dndt(self, r: y, beta_eff: float, Lambda: float, lam: list, C: list):
          '''
@@ -138,9 +154,9 @@ class Node:
          self.drdt = fb
     
     def dydt(self):
-          y1 = self.BulkFlow
-          y2 = self.internal
-          y3 = self.convective
+          y1 = self.dTdt_bulk_flow
+          y2 = self.dTdt_internal
+          y3 = self.dTdt_convective
           y4 = self.dndt
           y5 = self.dcdt
           y6 = self.drdt
