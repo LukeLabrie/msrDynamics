@@ -9,9 +9,8 @@ class System:
      def __init__(self, nodes: list = []) -> None:
           self.n_nodes = 0
           self.nodes = nodes
-          self.integrator = None
           self.input = None 
-          return None
+          self.integrator = None
      
      def add_input(self, input_func, T):
           spline = CubicHermiteSpline(n=1)
@@ -31,20 +30,29 @@ class System:
                 self.nodes.append(n)
                 self.n_nodes += 1
                 index += 1
-          return self.nodes
+          return None
+     
+     def dydt(self):
+          return [N.dydt() for N in self.nodes]
 
      def solve(self, T: list):
 
           # initialize JiTCDDE integrator
           if (self.input):
-               dydt = [N.dydt() for N in self.nodes]
-               Y0 = [N.y0 for N in self.nodes]
+               dydt = []
+               Y0 = []
+               for N in self.nodes:
+                   dydt.append(N.dTdt_bulk_flow + N.dTdt_convective + N.dTdt_internal + N.dndt + N.drdt + N.dcdt)
+                   Y0.append(N.y0)
                DDE = jitcdde_input(dydt,self.input)
                DDE.constant_past(Y0)
                self.integrator = DDE
           else:
-               dydt = [N.dydt() for N in self.nodes]
-               Y0 = [N.y0 for N in self.nodes]
+               dydt = []
+               Y0 = []
+               for N in self.nodes:
+                   dydt.append(N.dTdt_bulk_flow + N.dTdt_convective + N.dTdt_internal + N.dndt + N.drdt + N.dcdt)
+                   Y0.append(N.y0)
                DDE = jitcdde(dydt)
                DDE.constant_past(Y0)
                self.integrator = DDE
@@ -56,7 +64,7 @@ class System:
                y.append(self.integrator.integrate(t_x))
           # populate node objects with solutions 
           for s in enumerate(self.nodes):
-               s[1].solution = [state[s[0]] for state in y]
+               s[1].y_out = [state[s[0]] for state in y]
           return y
 
 class Node:
@@ -76,7 +84,7 @@ class Node:
         self.dcdt = 0.0
         self.drdt = 0.0
         self.y = None           # temperature (K), to be assigned by System class
-        self.solution = []      # solution data, can be populated by solve method
+        self.y_out = []      # solution data, can be populated by solve method
     
     def set_dTdt_bulkFlow(self, source):
         '''

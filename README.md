@@ -7,14 +7,15 @@ but can be extended to other fission, or thermal hydraulic systems.
 
 ## Example
 
-The diagram below describes a simple MSR system 
+The diagram below describes a simple MSR system. The notebook for the example below can be found in 
+[notebooks/toyModel.ipynb](./notebooks/toyModel.ipynb).
 
 ![msr_diagram](toyModel.drawio.png)
 
-First, `Node` and `System` objects are instantiated, with relevant parameters to describe the state of the node. 
+First, `Node` and `System` objects are instantiated, with relevant parameters to describe the state of the node. Note, the parameters for this example are mostly borrowed from the Aircraft Reactor Experiment (ARE) notebook, see [notebooks/ARE.ipynb](./notebooks/ARE.ipynb).
 
 ```python
-from parameters import *
+from toyParameters import *
 from msrDynamics.objects import Node, System
 import matplotlib.pyplot as plt
 
@@ -24,7 +25,7 @@ MSR = System()
 # core nodes
 cf_in = Node(m = m_f_c/2, scp = scp_f, W = W_f, y0 = T0_c_f1)  # core fuel inlet
 cf_out = Node(m = m_f_c/2, scp = scp_f, W = W_f, y0 = T0_c_f2) # core fuel outlet
-cm = Node(m = m_m_c, scp = scp_m, y0 = 1005.8056360691721)                 # core moderator
+cm = Node(m = m_m_c, scp = scp_m, y0 = T0_c_m)                 # core moderator
 
 n = Node(y0 = n_frac0)     # fractional neutron density
 C1 = Node(y0 = C0[0])      # precursor group 1
@@ -51,11 +52,13 @@ MSR.addNodes([cf_in,cf_out,cm,n,C1,C2,C3,C4,C5,C6,rho,
               hx_p_in,hx_p_out,hx_t,hx_s_in,hx_s_out])
 ```
 
-Once nodes are added to the `System` object, dynamics can be defined. 
+Once nodes are added to the `System` object, dynamics can be defined. Variables can be accessed
+by calling their associated $y$ function from JiTCDDE, i.e. `node_name.y()`. To access a variable with some delay $t-tau$, simply provide the time as an argument, i.e. `node_name.y(t-tau)`. 
+simply 
 
 ```python
 # core
-cf_in.set_dTdt_bulkFlow(source = hx_p_out.y()) 
+cf_in.set_dTdt_bulkFlow(source = hx_p_out.y(t-tau_c)) 
 cf_in.set_dTdt_internal(source = n.y(), k = k_f1*P/mcp_f_c)
 cf_in.set_dTdt_convective(source = [cm.y()], hA = [hA_ft_c/2])
 
@@ -76,7 +79,7 @@ C6.set_dcdt(n.y(), beta[5], Lam, lam[5], tau_c, tau_l)
 rho.set_drdt([cf_in.dydt(),cf_out.dydt(),cm.dydt()],[a_f/2,a_f/2,a_b])
 
 # heat exchanger
-hx_p_in.set_dTdt_bulkFlow(source = cf_out.y())
+hx_p_in.set_dTdt_bulkFlow(source = cf_out.y(t-tau_c))
 hx_p_in.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ft_hx])
 
 hx_p_out.set_dTdt_bulkFlow(source = hx_p_in.y())
