@@ -53,7 +53,7 @@ MSR.addNodes([cf_in,cf_out,cm,n,C1,C2,C3,C4,C5,C6,rho,
 ```
 
 Once nodes are added to the `System` object, dynamics can be defined. Variables can be accessed
-by calling their associated $y$ function from JiTCDDE, i.e. `node_name.y()`. To access a variable with some delay $t-tau$, simply provide the time as an argument, i.e. `node_name.y(t-tau)`. 
+by calling their associated `y` function from JiTCDDE, i.e. `node_name.y()`. To access a variable at a previous time $t-tau$, simply provide the time as an argument, i.e. `node_name.y(t-tau)`. 
 simply 
 
 ```python

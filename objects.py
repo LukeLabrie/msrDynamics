@@ -6,9 +6,11 @@ class System:
      '''
      Stores and operates on the system defined by a set of nodes
      '''
-     def __init__(self, nodes: list = []) -> None:
+     def __init__(self, nodes: list = [], dydt: list = [], y0: list = []) -> None:
           self.n_nodes = 0
           self.nodes = nodes
+          self.dydt = dydt
+          self.y0 = y0
           self.input = None 
           self.integrator = None
      
@@ -30,33 +32,29 @@ class System:
                 self.nodes.append(n)
                 self.n_nodes += 1
                 index += 1
-          return None
-     
-     def dydt(self):
-          return [N.dydt() for N in self.nodes]
 
-     def solve(self, T: list):
-
-          # initialize JiTCDDE integrator
+     def finalize(self):
+          '''
+          initiates and returns JiTCDDE integrator 
+          '''
           if (self.input):
-               dydt = []
-               Y0 = []
-               for N in self.nodes:
-                   dydt.append(N.dTdt_bulk_flow + N.dTdt_convective + N.dTdt_internal + N.dndt + N.drdt + N.dcdt)
-                   Y0.append(N.y0)
-               DDE = jitcdde_input(dydt,self.input)
-               DDE.constant_past(Y0)
+               self.dydt = [n.dTdt_bulk_flow + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
+               self.y0 = [n.y0 for n in self.nodes]
+               DDE = jitcdde_input(self.dydt,self.input)
+               DDE.constant_past(self.y0)
                self.integrator = DDE
           else:
-               dydt = []
-               Y0 = []
-               for N in self.nodes:
-                   dydt.append(N.dTdt_bulk_flow + N.dTdt_convective + N.dTdt_internal + N.dndt + N.drdt + N.dcdt)
-                   Y0.append(N.y0)
-               DDE = jitcdde(dydt)
-               DDE.constant_past(Y0)
+               self.dydt = [n.dTdt_bulk_flow + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
+               self.y0 = [n.y0 for n in self.nodes]
+               DDE = jitcdde(self.dydt)
+               DDE.constant_past(self.y0)
                self.integrator = DDE
-
+          return self.integrator
+     
+     def get_dydt(self):
+          return [n.dydt() for n in self.nodes]
+               
+     def solve(self, T: list):
           # solution 
           y = []
           # integrate
@@ -111,6 +109,8 @@ class Node:
         a: from node(s) (state variable(s) y(i))
         hA_mcp: ratio of [convective heat transfer coefficient(s) * wetted area(s) (MW/C)]
         '''
+        # reset in case of update
+        self.dTdt_convective = 0.0
         for i in range(len(source)):
                 self.dTdt_convective += hA[i]*(source[i]-self.y())/(self.m*self.scp)
     
@@ -168,6 +168,5 @@ class Node:
           y4 = self.dndt
           y5 = self.dcdt
           y6 = self.drdt
-          sum = y1 + y2 + y3 + y4 + y5 + y6
-          return sum
+          return y1 + y2 + y3 + y4 + y5 + y6
 
