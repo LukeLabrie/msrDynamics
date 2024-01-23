@@ -16,6 +16,7 @@ First, `Node` and `System` objects are instantiated, with relevant parameters to
 
 ```python
 from toyParameters import *
+from jitcdde import t
 from msrDynamics.objects import Node, System
 import matplotlib.pyplot as plt
 
@@ -48,7 +49,7 @@ Nodes are added to the `System` object which takes care of instantiation and ind
 JiTCDDE backend. 
 
 ```python
-MSR.addNodes([cf_in,cf_out,cm,n,C1,C2,C3,C4,C5,C6,rho,
+MSR.add_nodes([cf_in,cf_out,cm,n,C1,C2,C3,C4,C5,C6,rho,
               hx_p_in,hx_p_out,hx_t,hx_s_in,hx_s_out])
 ```
 
@@ -58,16 +59,17 @@ simply
 
 ```python
 # core
-cf_in.set_dTdt_bulkFlow(source = hx_p_out.y(t-tau_c)) 
-cf_in.set_dTdt_internal(source = n.y(), k = k_f1*P/mcp_f_c)
+# core
+cf_in.set_dTdt_advective(source = hx_p_out.y(t-tau_hx_c_f)) 
+cf_in.set_dTdt_internal(source = n.y(), k = k_f1*P)
 cf_in.set_dTdt_convective(source = [cm.y()], hA = [hA_ft_c/2])
 
-cf_out.set_dTdt_bulkFlow(source = cf_in.y()) 
-cf_out.set_dTdt_internal(source = n.y(), k = k_f2*P/mcp_f_c)
+cf_out.set_dTdt_advective(source = cf_in.y()) 
+cf_out.set_dTdt_internal(source = n.y(), k = k_f2*P)
 cf_out.set_dTdt_convective(source = [cm.y()], hA = [hA_ft_c/2])
 
-cm.set_dTdt_internal(source = n.y(), k = k_m*P/mcp_m_c)
-cm.set_dTdt_convective(source = [cf_in.y(), cf_out.y()], hA = [hA_mc_c]*2)
+cm.set_dTdt_internal(source = n.y(), k = k_m*P)
+cm.set_dTdt_convective(source = [cf_in.y(), cf_out.y()], hA = [hA_mc_c/2]*2)
 
 n.set_dndt(rho.y(), beta_t, Lam, lam, [C1.y(), C2.y(), C3.y(), C4.y(), C5.y(), C6.y()])
 C1.set_dcdt(n.y(), beta[0], Lam, lam[0], tau_c, tau_l)
@@ -79,19 +81,19 @@ C6.set_dcdt(n.y(), beta[5], Lam, lam[5], tau_c, tau_l)
 rho.set_drdt([cf_in.dydt(),cf_out.dydt(),cm.dydt()],[a_f/2,a_f/2,a_b])
 
 # heat exchanger
-hx_p_in.set_dTdt_bulkFlow(source = cf_out.y(t-tau_c))
+hx_p_in.set_dTdt_advective(source = cf_out.y(t-tau_c_hx_f))
 hx_p_in.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ft_hx])
 
-hx_p_out.set_dTdt_bulkFlow(source = hx_p_in.y())
+hx_p_out.set_dTdt_advective(source = hx_p_in.y())
 hx_p_out.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ft_hx])
 
 hx_t.set_dTdt_convective(source = [hx_p_in.y(),hx_p_out.y(),hx_s_in.y(),hx_s_out.y()],
                               hA = [hA_ft_hx, hA_ft_hx, hA_ht_hx, hA_ht_hx])
 
-hx_s_in.set_dTdt_bulkFlow(source = 100)
+hx_s_in.set_dTdt_advective(source = 50)
 hx_s_in.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ht_hx])
 
-hx_s_out.set_dTdt_bulkFlow(source = hx_s_in.y())
+hx_s_out.set_dTdt_advective(source = hx_s_in.y())
 hx_s_out.set_dTdt_convective(source = [hx_t.y()], hA = [hA_ht_hx])
 ```
 
@@ -105,11 +107,11 @@ Results for the above system are shown below.
 
 ![msr_diagram](toyPlot.png)
 
-Solutions can be accessed from the `solution` attribute of the associated node. The snippet below is used for the plot above. 
+Solutions can be accessed from the `y_out` attribute of the associated node. The snippet below is used for the plot above. 
 
 ```python
 # P
-axs[0].plot(T, [k*P for k in n.solution])
+axs[0].plot(T, [k*P for k in n.y_out])
 axs[0].set_xlim(t0,tf)
 axs[0].set_title("Power (MW)")
 axs[0].set_xlabel(r"$t$ (s)")

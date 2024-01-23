@@ -20,11 +20,26 @@ class System:
           self.input = spline
           return input(0)
      
+     def _finalize(self):
+          '''
+          initiates and returns JiTCDDE integrator 
+          '''
+          if (self.input):
+               self.dydt = [n.dTdt_advective + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
+               self.y0 = [n.y0 for n in self.nodes]
+               DDE = jitcdde_input(self.dydt,self.input)
+               DDE.constant_past(self.y0)
+               self.integrator = DDE
+          else:
+               self.dydt = [n.dTdt_advective + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
+               self.y0 = [n.y0 for n in self.nodes]
+               DDE = jitcdde(self.dydt)
+               DDE.constant_past(self.y0)
+               self.integrator = DDE
+     
      def add_nodes(self, new_nodes: list):
           '''
-          Assigns state variable object y(), with unique index for each node, 
-          and initializaes the JiTCDDE integrator
-          new_nodes:
+          Assigns state variable object y(), with unique index for each node
           '''
           index = self.n_nodes
           for n in new_nodes: 
@@ -33,65 +48,80 @@ class System:
                 self.n_nodes += 1
                 index += 1
 
-     def finalize(self):
-          '''
-          initiates and returns JiTCDDE integrator 
-          '''
-          if (self.input):
-               self.dydt = [n.dTdt_bulk_flow + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
-               self.y0 = [n.y0 for n in self.nodes]
-               DDE = jitcdde_input(self.dydt,self.input)
-               DDE.constant_past(self.y0)
-               self.integrator = DDE
-          else:
-               self.dydt = [n.dTdt_bulk_flow + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
-               self.y0 = [n.y0 for n in self.nodes]
-               DDE = jitcdde(self.dydt)
-               DDE.constant_past(self.y0)
-               self.integrator = DDE
-          return self.integrator
-     
      def get_dydt(self):
           return [n.dydt() for n in self.nodes]
                
      def solve(self, T: list):
+          # set integrator 
+          self._finalize()
+
           # solution 
           y = []
+
           # integrate
           for t_x in T:
                y.append(self.integrator.integrate(t_x))
+               
           # populate node objects with solutions 
           for s in enumerate(self.nodes):
                s[1].y_out = [state[s[0]] for state in y]
           return y
 
 class Node:
+    """
+    This class represents a node in an MSR system, encapsulating physical properties and dynamics
+
+    Attributes:
+        m (float): Mass of the node in kilograms (kg).
+        scp (float): Specific heat capacity of the node in joules per kilogram kelvin (J/(kg*K)).
+        W (float): Mass flow rate through the node in kilograms per second (kg/s).
+        y0 (float): Initial temperature of the node in kelvin (K).
+        dTdt_bulk_flow (float): Symbolic expression for the rate of temperature change due to advective heat flow in kelvin per second (K/s).
+        dTdt_internal (float): Symbolic expression for the rate of temperature change due to internal heat generation in kelvin per second (K/s).
+        dTdt_convective (float): Symbolic expression for the rate of temperature change due to convective heat flow in kelvin per second (K/s).
+        dndt (float): Symbolic expression for the rate of change of neutron population.
+        dcdt (float): Symbolic expression for the rate of change of precursor concentration.
+        drdt (float): Symbolic expression for the rate of change of reactivity.
+        y: JiTCDDE state variable object, to be assigned by the System class.
+        y_out (list): Solution data, to be populated by the System class.
+
+    Methods:
+        set_dTdt_advective(source): Sets the rate of temperature change due to advection.
+        set_dTdt_internal(source, k): Sets the rate of temperature change due to internal heat generation.
+        set_dTdt_convective(source, hA): Sets the rate of temperature change due to convective heat transfer.
+        set_dndt(r, beta_eff, Lambda, lam, C): Sets the rate of change of neutron population using the point kinetics equation.
+        set_dcdt(n, beta, Lambda, lam, t_c, t_l): Sets the rate of change of precursor concentration.
+        set_drdt(sources, coeffs): Sets the rate of change of reactivity based on feedback.
+        dydt(): Calculates and returns the total rate of change of state variables.
+
+    The class is designed to model the thermal-hydraulic and neutron-kinetic behavior of a node within a nuclear reactor system.
+    """
     def __init__(self,
                  m: float = 0.0,
                  scp: float = 0.0,
                  W: float = 0.0,
                  y0: float = 0.0) -> None:
-        self.m = m              # mass (kg)
-        self.scp = scp          # specific heat capacity (J/(kg*K))
-        self.W = W              # mass flow rate (kg/s)
-        self.y0 = y0            # initial temperature (K)
-        self.dTdt_bulk_flow = 0.0
-        self.dTdt_internal = 0.0
-        self.dTdt_convective = 0.0
-        self.dndt = 0.0
-        self.dcdt = 0.0
-        self.drdt = 0.0
-        self.y = None           # temperature (K), to be assigned by System class
-        self.y_out = []      # solution data, can be populated by solve method
+        self.m = m                 # mass (kg)
+        self.scp = scp             # specific heat capacity (J/(kg*°K))
+        self.W = W                 # mass flow rate (kg/s)
+        self.y0 = y0               # initial temperature (°K)
+        self.dTdt_advective = 0.0  # sym. expression for advective heat flow (°K/s)
+        self.dTdt_internal = 0.0   # sym. expression for internal heat generation (°K/s)
+        self.dTdt_convective = 0.0 # sym. expression for convective heat flow (°K/s)
+        self.dndt = 0.0            # sym. expression for dn/dt (n = neutron population)
+        self.dcdt = 0.0            # sym. expression for dc/dt (c = precursor concentration)
+        self.drdt = 0.0            # sym. expression for dr/dt (r = reactivity)
+        self.y = None              # JiTCDDE state variable object, to be assigned by System
+        self.y_out = []            # solution data, to be populated by System
     
-    def set_dTdt_bulkFlow(self, source):
+    def set_dTdt_advective(self, source):
         '''
         Energy from bulk flow
         source: source node (state variable y(i) or constant)
         dumped: if 'from node' is a constant (indicates dumping instead of 
                 recirculation), this needs to be set to true
         '''
-        self.dTdt_bulk_flow = (source-self.y())*self.W/self.m
+        self.dTdt_advective = (source-self.y())*self.W/self.m
  
 
     def set_dTdt_internal(self, source: callable, k: float):
@@ -100,7 +130,7 @@ class Node:
         source: source of generation (state variable y(i))
         k: constant of proportionality 
         '''
-        self.dTdt_internal = k*source
+        self.dTdt_internal = k*source/(self.m*self.scp)
     
 
     def set_dTdt_convective(self, source: list, hA: list):
@@ -162,7 +192,7 @@ class Node:
          self.drdt = fb
     
     def dydt(self):
-          y1 = self.dTdt_bulk_flow
+          y1 = self.dTdt_advective
           y2 = self.dTdt_internal
           y3 = self.dTdt_convective
           y4 = self.dndt

@@ -23,7 +23,7 @@ F = 1.0               # tweak convective heat flow terms
 pi = math.pi
 R = 8.314            # ideal gas constant
 m_H = 0.004          # molar mass of helium (kg/mol)
-P = 1.0              # steady-state power (MW) ORNL-1845 pg. 58
+P = 0.5              # steady-state power (MW) ORNL-1845 pg. 58
 
 # density
 rho_inconel = 8.5*1000          # inconel density (kg/m^3)
@@ -165,7 +165,7 @@ k_1 = 0.5
 k_2 = 1-k_1
 
 # thermal feedback (1/Kelvin, temperature provided in Kelvin) ORNL-1845 pg. 115
-a_f = (-4.8e-5)*9/5
+a_f = 1.1*(-4.8e-5)*9/5
 a_b = (1.1e-5)*9/5
 a_c = (-5.88e-5)*9/5
 
