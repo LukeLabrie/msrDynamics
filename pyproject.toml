@@ -1,0 +1,16 @@
+[build-system]
+requires = [
+    "setuptools>=42",
+    "wheel"
+]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "msrDynamics"
+version = "0.1.0"
+description = "Python API to JiTCDDE for neutronic and thermal hydraulic 
+               systems"
+authors = [
+    { name="Luke Labrie-Cleary", email="lplcleary@gmail.com" },
+]
+license = "MIT"
