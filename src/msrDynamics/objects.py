@@ -6,11 +6,14 @@ class System:
      '''
      Stores and operates on the system defined by a set of nodes
      '''
-     def __init__(self, nodes: list = [], dydt: list = [], y0: list = []) -> None:
+     def __init__(self, nodes = None, dydt = None, y0 = None) -> None:
           self.n_nodes = 0
-          self.nodes = nodes
-          self.dydt = dydt
-          self.y0 = y0
+          if not nodes:
+               self.nodes = []
+          if not dydt:
+               self.dydt = []
+          if not y0:
+               self.y0 = []
           self.input = None 
           self.integrator = None
      
@@ -24,6 +27,8 @@ class System:
           '''
           initiates and returns JiTCDDE integrator 
           '''
+          if (self.integrator): 
+               self.integrator = None
           if (self.input):
                self.dydt = [n.dTdt_advective + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
                self.y0 = [n.y0 for n in self.nodes]
@@ -44,6 +49,7 @@ class System:
           index = self.n_nodes
           for n in new_nodes: 
                 n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
+                n.index = index
                 self.nodes.append(n)
                 self.n_nodes += 1
                 index += 1
@@ -52,6 +58,12 @@ class System:
           return [n.dydt() for n in self.nodes]
                
      def solve(self, T: list):
+
+          # clear data
+          for n in self.nodes:
+               if (n.y_out.any()):
+                    n.y_out = []
+
           # set integrator 
           self._finalize()
 
@@ -64,7 +76,8 @@ class System:
                
           # populate node objects with solutions 
           for s in enumerate(self.nodes):
-               s[1].y_out = [state[s[0]] for state in y]
+               s[1].y_out = np.array([state[s[0]] for state in y])
+
           return y
 
 class Node:
@@ -76,7 +89,7 @@ class Node:
         scp (float): Specific heat capacity of the node in joules per kilogram kelvin (J/(kg*K)).
         W (float): Mass flow rate through the node in kilograms per second (kg/s).
         y0 (float): Initial temperature of the node in kelvin (K).
-        dTdt_bulk_flow (float): Symbolic expression for the rate of temperature change due to advective heat flow in kelvin per second (K/s).
+        dTdt_advective (float): Symbolic expression for the rate of temperature change due to advective heat flow in kelvin per second (K/s).
         dTdt_internal (float): Symbolic expression for the rate of temperature change due to internal heat generation in kelvin per second (K/s).
         dTdt_convective (float): Symbolic expression for the rate of temperature change due to convective heat flow in kelvin per second (K/s).
         dndt (float): Symbolic expression for the rate of change of neutron population.
@@ -112,27 +125,30 @@ class Node:
         self.dcdt = 0.0            # sym. expression for dc/dt (c = precursor concentration)
         self.drdt = 0.0            # sym. expression for dr/dt (r = reactivity)
         self.y = None              # JiTCDDE state variable object, to be assigned by System
-        self.y_out = []            # solution data, to be populated by System
+        self.index = None          # JiTCDDE state variable index, to be assigned by System
+        self.y_out = np.array([])  # solution data, to be populated by System
     
     def set_dTdt_advective(self, source):
         '''
-        Energy from bulk flow
+        Energy from advective heat transfer
         source: source node (state variable y(i) or constant)
         dumped: if 'from node' is a constant (indicates dumping instead of 
                 recirculation), this needs to be set to true
         '''
+        # reset in case of update
+        self.dTdt_advective = 0.0
         self.dTdt_advective = (source-self.y())*self.W/self.m
  
-
     def set_dTdt_internal(self, source: callable, k: float):
         '''
         Energy from fission
         source: source of generation (state variable y(i))
         k: constant of proportionality 
         '''
+        # reset in case of update
+        self.dTdt_internal = 0.0
         self.dTdt_internal = k*source/(self.m*self.scp)
     
-
     def set_dTdt_convective(self, source: list, hA: list):
         '''
         Energy from convective heat transfer
@@ -153,6 +169,8 @@ class Node:
          lam: decay constants for associated precursor groups
          C: precursor groups (list of state variables y(i))
          '''
+         # reset in case of update
+         self.dndt = 0.0
          precursors = 0.0
          for g in enumerate(lam):
               precursors += g[1]*C[g[0]]
@@ -174,6 +192,8 @@ class Node:
          t_c: core transit time (s)
          t_l: loop transit time (s)
          '''
+         # reset in case of update
+         self.dcdt = 0.0
          source = n*beta/Lambda
          decay = lam*self.y()
          outflow = self.y()/t_c
@@ -186,6 +206,8 @@ class Node:
          sources: list of derivatives of feedback sources (dy(i)/dt)
          coeffs: list of respective feedback coefficients
          '''
+         # reset in case of update
+         self.drdt = 0.0
          fb = 0.0
          for s in enumerate(sources):
               fb += s[1]*coeffs[s[0]]
@@ -199,4 +221,3 @@ class Node:
           y5 = self.dcdt
           y6 = self.drdt
           return y1 + y2 + y3 + y4 + y5 + y6
-
