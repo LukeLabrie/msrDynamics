@@ -8,16 +8,22 @@ class System:
      '''
      def __init__(self, nodes = None, dydt = None, y0 = None) -> None:
           self.n_nodes = 0
+
+          # avoids using mutable objects as default arguments, which causes a memory leak
           if not nodes:
                self.nodes = []
           if not dydt:
                self.dydt = []
           if not y0:
                self.y0 = []
+
           self.input = None 
           self.integrator = None
      
      def add_input(self, input_func, T):
+          '''
+          adds an input function of time to the integrator
+          '''
           spline = CubicHermiteSpline(n=1)
           spline.from_function(input_func, times_of_interest = T)
           self.input = spline
@@ -55,10 +61,15 @@ class System:
                 index += 1
 
      def get_dydt(self):
+          '''
+          returns rhs equations of the system
+          '''
           return [n.dydt() for n in self.nodes]
                
      def solve(self, T: list):
-
+          '''
+          solves system and returns np.array() with solution matrix
+          '''
           # clear data
           for n in self.nodes:
                if (n.y_out.any()):
@@ -78,7 +89,7 @@ class System:
           for s in enumerate(self.nodes):
                s[1].y_out = np.array([state[s[0]] for state in y])
 
-          return y
+          return np.array(y)
 
 class Node:
     """
