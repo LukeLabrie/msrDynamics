@@ -17,7 +17,7 @@ First, `Node` and `System` objects are instantiated, with relevant parameters to
 ```python
 from toyParameters import *
 from jitcdde import t
-from msrDynamics.objects import Node, System
+import msrDynamics
 import matplotlib.pyplot as plt
 
 # MSR system        
