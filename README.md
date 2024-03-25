@@ -18,7 +18,7 @@ The project is not yet available on PyPI.
 
 The API creates nodal systems, of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
 
-Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer as well as neutron kinetics. Note, this means that a node can also represent state variables associated with neutron kinetics, like neutron concentration $n(t)$ delayed neutorn precursor concentrations $C_i(t)$, and therefore does not need to be associated with a thermal mass. The helper methods take other nodes to which a given node is coupled, along with relevant system parameters, as arguments, and sets up the symbolic expressions representing the equations govenring the dynamics of the node. These symbolic expressions are the input to the `JITCDDE` backend. Alternatively, if the user wishes to circumvent the helper methods, or would like to define other dynamics, a node's dynamics can be set directly with a user-defined symbolic expression through the `Node.dydt` attribute, e.g.
+Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer as well as neutron kinetics. Note, this means that a node can also represent state variables associated with neutron kinetics, like neutron concentration $n(t)$ delayed neutorn precursor concentrations $C_i(t)$, and therefore does not need to be associated with a thermal mass. The helper methods take other nodes to which a given node is coupled, along with relevant system parameters, as arguments, and sets up the symbolic expressions representing the equations govenring the dynamics of the node. These symbolic expressions are the input to the [JiTCDDE](https://github.com/neurophysik/jitcdde) backend. Alternatively, if the user wishes to circumvent the helper methods, or would like to define other dynamics, a node's dynamics can be set directly with a user-defined symbolic expression through the `Node.dydt` attribute, e.g.
 
 ```python
 # instantiate system 
@@ -28,12 +28,17 @@ f = System()
 x = Node(m = m_x)
 y = Node(m = m_y)
 
+# add nodes to system
+f.add_nodes([x,y])
+
 # define dynamics 
 x.dydt = x.y() - y.y()
 y.dydt = - x.y() + y.y() 
 ```
 
 Implentation of the `Node()` object and associated helper methods is demonstrated in the examples below. 
+
+Note, for any system, a `System()` object is required for proper handling of the global indexing required for the [JiTCDDE](https://github.com/neurophysik/jitcdde) backend. **Nodes need to be added to the system object before dynamics are defined**. This is because 
 
 ## Example
 
