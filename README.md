@@ -3,7 +3,7 @@
 msrDynamics is an object-oriented API to [JiTCDDE](https://github.com/neurophysik/jitcdde), 
 a delay differential equation solver, written with emulation of simulink-style solvers for
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
-but can be extended to other fission and/or thermal hydraulic systems. 
+but can be extended to other fission and/or thermal hydraulic systems. The goal of this package is to streamline the implemetation of such nodal models for more complex systems, where direct handling of the equations can become cumbersome. 
 
 
 ## Installation
@@ -16,10 +16,24 @@ The project is not yet available on PyPI.
 
 ## Methodology 
 
-The API creates nodal systems, of the form discussed in the examples below, whereby system masses are aggregated into nodes with associated properties,
-and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
+The API creates nodal systems, of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
 
-Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer. Note, a node can also represent state variables associated with neutron kinetics, like neutron concentration $n(t)$ and delayed neutorn precursor concentrations $C_i(t)$  
+Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer as well as neutron kinetics. Note, this means that a node can also represent state variables associated with neutron kinetics, like neutron concentration $n(t)$ delayed neutorn precursor concentrations $C_i(t)$, and therefore does not need to be associated with a thermal mass. The helper methods take other nodes to which a given node is coupled, along with relevant system parameters, as arguments, and sets up the symbolic expressions representing the equations govenring the dynamics of the node. These symbolic expressions are the input to the `JITCDDE` backend. Alternatively, if the user wishes to circumvent the helper methods, or would like to define other dynamics, a node's dynamics can be set directly with a user-defined symbolic expression through the `Node.dydt` attribute, e.g.
+
+```python
+# instantiate system 
+f = System()
+
+# instantiate nodes
+x = Node(m = m_x)
+y = Node(m = m_y)
+
+# define dynamics 
+x.dydt = x.y() - y.y()
+y.dydt = - x.y() + y.y() 
+```
+
+Implentation of the `Node()` object and associated helper methods is demonstrated in the examples below. 
 
 ## Example
 
