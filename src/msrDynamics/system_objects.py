@@ -65,6 +65,15 @@ class System:
           returns rhs equations of the system
           '''
           return [n.dydt() for n in self.nodes]
+     
+     def get_state_by_index(self, i: int, j: int):
+          '''
+          returns the state of the i^th state variable at the j^th time index
+          as (value, derivative)
+          '''
+          val = self.integrator.get_state()[j][1][i]
+          deriv = self.integrator.get_state()[j][2][i]
+          return (val,deriv)
                
      def solve(self, T: list):
           '''
@@ -84,7 +93,7 @@ class System:
           # integrate
           for t_x in T:
                y.append(self.integrator.integrate(t_x))
-               
+
           # populate node objects with solutions 
           for s in enumerate(self.nodes):
                s[1].y_out = np.array([state[s[0]] for state in y])
@@ -138,17 +147,19 @@ class Node:
           self.y = None              # JiTCDDE state variable object, to be assigned by System
           self.index = None          # JiTCDDE state variable index, to be assigned by System
           self.y_out = np.array([])  # solution data, to be populated by System
+          self.y_rhs = np.array([])  # solution data, to be populated by System
 
      def set_dTdt_advective(self, source):
           '''
           Energy from advective heat transfer
-          source: source node (state variable y(i) or constant)
+          source: source node (node or constant)
           dumped: if 'from node' is a constant (indicates dumping instead of 
                     recirculation), this needs to be set to true
           '''
           # reset in case of update
           self.dTdt_advective = 0.0
           self.dTdt_advective = (source-self.y())*self.W/self.m
+
 
      def set_dTdt_internal(self, source: callable, k: float):
           '''
@@ -163,8 +174,9 @@ class Node:
      def set_dTdt_convective(self, source: list, hA: list):
           '''
           Energy from convective heat transfer
-          a: from node(s) (state variable(s) y(i))
-          hA_mcp: ratio of [convective heat transfer coefficient(s) * wetted area(s) (MW/C)]
+          a: (list of state variable(s) y(i)) from node(s) 
+          hA: (list of state variable(s) y(i)) convective heat transfer 
+               coefficient(s) * wetted area(s) (MW/C)
           '''
           # reset in case of update
           self.dTdt_convective = 0.0

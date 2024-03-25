@@ -1,4 +1,4 @@
-from msrDynamics.core_objects import Node
+from msrDynamics.system_objects import Node
 
 class mann_HX:
     '''

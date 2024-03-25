@@ -1,1 +1,1 @@
-from .core_objects import Node, System
+from .system_objects import Node, System

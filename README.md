@@ -5,6 +5,16 @@ a delay differential equation solver, written with emulation of simulink-style s
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
 but can be extended to other fission, or thermal hydraulic systems. 
 
+## Installation
+
+Clone this repository and install the project with pip by providing the path to the project folder. 
+```
+pip install </path/to/msrDynamics>
+```
+The project is not yet available on PyPI. 
+
+## Methodology 
+
 ## Example
 
 The diagram below describes a simple MSR system. The notebook for the example below can be found in 
