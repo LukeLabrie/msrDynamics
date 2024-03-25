@@ -3,17 +3,23 @@
 msrDynamics is an object-oriented API to [JiTCDDE](https://github.com/neurophysik/jitcdde), 
 a delay differential equation solver, written with emulation of simulink-style solvers for
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
-but can be extended to other fission, or thermal hydraulic systems. 
+but can be extended to other fission and/or thermal hydraulic systems. 
+
 
 ## Installation
 
-Clone this repository and install the project with pip by providing the path to the project folder. 
+Clone this repository. Then, within your preferred python environment, install the project with pip by providing the path to the project folder. 
 ```
 pip install </path/to/msrDynamics>
 ```
 The project is not yet available on PyPI. 
 
 ## Methodology 
+
+The API creates nodal systems, of the form discussed in the examples below, whereby system masses are aggregated into nodes with associated properties,
+and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
+
+Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer. Note, a node can also represent state variables associated with neutron kinetics, like neutron concentration $n(t)$ and delayed neutorn precursor concentrations $C_i(t)$  
 
 ## Example
 
