@@ -16,7 +16,7 @@ insert_duration = 0.4/0.011 # ORNL-1845
 t_ins = 300.00
 
 # debugging constants
-arbitrary_removal = 0 # test effect of increased remvoal from system 
+arbitrary_removal = 0 # test effect of increased remvoal from system
 F = 1.0               # tweak convective heat flow terms
 
 # dimensions
@@ -30,13 +30,13 @@ rho_inconel = 8.5*1000          # inconel density (kg/m^3)
 rho_h = 0.167                   # helium density (kg/m^3) NEEDS TO BE TEMPERATURE DEPENDENT
 rho_m = 2.75*1000               # BeO density (kg/m^3) ORNL-1845 p.
 
-# specific heat capacities 
-#scp_f = 1.9665e-3       # specific heat capacity of fuel salt (BTU/lb*defF) -> (MJ/kg-C) ORNL-TM-0728 p.8
-scp_t = 0.101*4.1869e-3 # specific heat capacity of inconel 600 (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
-scp_f = 0.26*4.1869e-3  # specific heat capacity of fuel salt ORNL-1845 p.113 (BTU/lb*defF) -> (MJ/kg-C)
-scp_c = 0.3*4.1869e-3   # specific heat capacity of cooolant (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
-scp_h = 1.248*4.1869e-3 # specigic heat capacity of helium (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
-scp_m = 0.48*4.1869e-3  # specific heat capcity of moderator (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
+# specific heat capacities
+#scp_f = 1.9665e-3      # fuel salt (BTU/lb*defF) -> (MJ/kg-C) ORNL-TM-0728 p.8
+scp_t = 0.101*4.1869e-3 # inconel 600 (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
+scp_f = 0.26*4.1869e-3  # fuel salt ORNL-1845 p.113 (BTU/lb*defF) -> (MJ/kg-C)
+scp_c = 0.3*4.1869e-3   # cooolant (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
+scp_h = 1.248*4.1869e-3 # helium (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
+scp_m = 0.48*4.1869e-3  # moderator (BTU/lb*defF) -> (MJ/kg-C) ORNL-1845 p.113
 
 # delays
 tau_hx_c_f = 20. # fuel-helium hx to core delay (unknown)
@@ -51,13 +51,15 @@ tau_c = 8.3  # ORNL-1845 p.120
 #tau_c = 8.3  # ORNL-1845 p.120
 n_frac0 = 1.0  # initial fractional neutron density n/n0 (n/cm^3/s)
 # Lam = 2.400E-04  # mean generation time ORNL-TM-1070 p.15 U235
-Lam = (2.400E-04)  # mean generation time ORNL-TM-1070 p.15 U235
+Lam = 2.400E-04  # mean generation time ORNL-TM-1070 p.15 U235
 # Lam = 4.0E-04;  # mean generation time ORNL-TM-1070 p.15 U233
 lam = np.array([1.240E-02, 3.05E-02, 1.11E-01, 3.01E-01, 1.140E+00, 3.014E+00])
-beta = (np.array([0.000223, 0.001457, 0.001307, 0.002628, 0.000766, 0.00023]))  # U235
+beta = np.array([0.000223, 0.001457, 0.001307, 0.002628, 0.000766, 0.00023])  # U235
 # beta = np.array([0.00023, 0.00079, 0.00067, 0.00073, 0.00013, 0.00009])  # U233
 beta_t = np.sum(beta)  # total delayed neutron fraction MSRE
-rho_0 = beta_t-sum(np.divide(beta,1+np.divide(1-np.exp(-lam*tau_l),lam*tau_c))) # reactivity change in going from stationary to circulating fuel
+right = beta_t
+left = sum(np.divide(beta,1+np.divide(1-np.exp(-lam*tau_l),lam*tau_c)))
+rho_0 = right-left # steady-state reactivity for circulating fuel 
 C0 = beta / Lam * (1.0 / (lam - (np.exp(-lam * tau_l) - 1.0) / tau_c))
 
 
@@ -136,7 +138,6 @@ def hA(W,points):
 
     returns hA in BTU/(sec*degF)
     '''
-
     # Create matrices for the system of equations
     order = len(points) 
     a = [[p.x**i for i in reversed(range(order))] for p in points]
@@ -150,8 +151,6 @@ def hA(W,points):
     terms = [coeffs[i]*W**(order-i) for i in range(order)]
 
     return sum(terms)
-
-
 
 ###############################################################################
 # core
@@ -170,7 +169,7 @@ a_b = (1.1e-5)*9/5
 a_c = (-5.88e-5)*9/5
 
 # operating conditions taken from 25-hr Xenon run Exp. H-8
-# temperatures 
+# temperatures
 T_fuel_avg = F_to_K(1311)       # ORNL 1845 pg. 58
 T0_c_f1 = F_to_K(1209)          # core fuel inlet temp (K) ORNL-1845 pg. 120
 T0_c_f2 = F_to_K(1522)          # core fuel outlet temp (K) ORNL-1845 pg. 120
