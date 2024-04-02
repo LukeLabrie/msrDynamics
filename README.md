@@ -38,9 +38,9 @@ y.dydt = - x.y() + y.y()
 
 Implentation of the `Node()` object and associated helper methods is demonstrated in the examples below. 
 
-Note, for any system, a `System()` object is required for proper handling of the global indexing required for the [JiTCDDE](https://github.com/neurophysik/jitcdde) backend. **Nodes need to be added to the system object before dynamics are defined**. This is because 
+Note, for any system, a `System()` object is required for proper handling of the global indexing required for the [JiTCDDE](https://github.com/neurophysik/jitcdde) backend. **Nodes need to be added to the system object before dynamics are defined**. This is because certain global system information is required in order to index the variables properly for the backend. 
 
-## Example
+## Simple Example
 
 The diagram below describes a simple MSR system. The notebook for the example below can be found in 
 [notebooks/toyModel.ipynb](./notebooks/toyModel.ipynb).
@@ -145,10 +145,13 @@ Results for the above system are shown below.
 Solutions can be accessed from the `y_out` attribute of the associated node. The snippet below is used for the plot above. 
 
 ```python
-# P
 axs[0].plot(T, [k*P for k in n.y_out])
 axs[0].set_xlim(t0,tf)
 axs[0].set_title("Power (MW)")
 axs[0].set_xlabel(r"$t$ (s)")
 axs[0].set_ylabel("MW")
 ```
+
+## MSRE
+
+The Molten-Salt Reactor Experiment ([MSRE](https://en.wikipedia.org/wiki/Molten-Salt_Reactor_Experiment)) ran at ORNL from 1965-1969. A nodal model of the form discussed above can be implemented in msrDynamics. For brevity, the implementation is not included here but can be found 

@@ -1,4 +1,4 @@
-from msrDynamics.system_objects import Node
+from .system_objects import Node
 
 class mann_HX:
     '''
@@ -6,10 +6,12 @@ class mann_HX:
     a lumped (Mann's) model
     '''
 
-    def __init__(self, system, m_p=0.0, c_p=0.0, w_p=0.0, p1_0=0.0, p2_0=0.0, m_s=0.0, 
-                 c_s=0.0, w_s=0.0, s1_0=0.0, s2_0=0.0, m_t=0.0, c_t=0.0,
-                 t0=0.0, hA_pt=0.0, hA_st=0.0, n_lumps=1, p_inlet = None, 
-                 s_inlet = None) -> None:
+    def __init__(self, system, m_p=0.0, c_p=0.0, w_p=0.0, p1_0=0.0, p2_0=0.0, 
+                 m_s=0.0, c_s=0.0, w_s=0.0, s1_0=0.0, s2_0=0.0, m_t=0.0, 
+                 c_t=0.0,t0=0.0, hA_pt=0.0, hA_st=0.0, n_lumps=1, 
+                 p_inlet = None, s_inlet = None) -> None:
+        
+        # unpack arguments 
         self.system = system       # msrDynamics System object
         self.m_p = m_p             # primary fluid total mass
         self.c_p = c_p             # primary fluid specific heat capacity
@@ -30,8 +32,6 @@ class mann_HX:
 
     def get_nodes(self):
 
-        nodes = []
-
         # fluid node masses
         m_pn = self.m_p/(2*self.n_lumps)
         m_sn = self.m_s/(2*self.n_lumps)
@@ -51,6 +51,7 @@ class mann_HX:
         inc_s = dT_s/(2*self.n_lumps-1)
 
         # instantiate nodes
+        self.nodes = []
         for l in range(self.n_lumps):
 
             p1 = Node(m = m_pn, scp = self.c_p, W = self.w_p, y0 = self.p1_0-2*inc_p*l)
@@ -68,7 +69,7 @@ class mann_HX:
             self.system.add_nodes(new_nodes)
 
             for n in new_nodes:
-                nodes.append(n)
+                self.nodes.append(n)
 
             # store nodes in instance
             if self.nodes is None:
@@ -76,8 +77,15 @@ class mann_HX:
             else:
                 for n in new_nodes:
                     self.nodes.append(n)
+        
+        # add nodes to the system
+        self.system.add_nodes(self.nodes)
+        return self.nodes
+        
 
-        # define dynamics 
+    def set_dynamics(self, inlet: Node, outlet: Node):
+
+
         for l in range(self.n_lumps):
             p1 = self.nodes[0+l*5]
             p2 = self.nodes[1+l*5]
@@ -86,25 +94,21 @@ class mann_HX:
             s1 = self.nodes[3+l*5]
             s2 = self.nodes[4+l*5]
             if (self.n_lumps > 1) and (l > 0):
-                p1.set_dTdt_advective(source = nodes[-(9*l)].y()) 
-            p1.set_dTdt_convective(source = [t1_p.y()], hA = [hA_pt_n])
+                p1.set_dTdt_advective(source = self.nodes[-(9*l)].y()) 
+            p1.set_dTdt_convective(source = [t1_p.y()], hA = [self.hA_pt/(2*self.n_lumps)])
 
             p2.set_dTdt_advective(source = p1.y())
             p2.dTdt_convective = p1.dTdt_convective
 
-            t1_p.set_dTdt_convective(source = [p1.y(),nodes[-(5*l+2)].y()], hA = [2*hA_pt_n,2*hA_st_n])
-            # t1_s.set_dTdt_convective(source = [p1.y(),s1.y()], hA = [2*hA_pt_n,2*hA_st_n])
+            t1_p.set_dTdt_convective(source = [p1.y(),self.nodes[-(5*l+2)].y()], 
+                                     hA = [self.hA_pt/(self.n_lumps),self.hA_st/(self.n_lumps)])
 
             if (self.n_lumps > 1) and (l > 0):
-                s1.set_dTdt_advective(source = nodes[-(5*l+1)].y())
-            s1.set_dTdt_convective(source = [t1_s.y()], hA = [hA_st_n])
+                s1.set_dTdt_advective(source = self.nodes[-(5*l+1)].y())
+            s1.set_dTdt_convective(source = [t1_s.y()], hA = [self.hA_st/(2*self.n_lumps)])
             
             s2.set_dTdt_advective(source = s1.y())
             s2.dTdt_convective = s1.dTdt_convective
-
-
-        self.nodes = nodes
-        return self.nodes
 
 
 

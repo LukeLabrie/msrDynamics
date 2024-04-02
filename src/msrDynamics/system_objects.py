@@ -130,10 +130,10 @@ class Node:
      The class is designed to model the thermal-hydraulic and neutron-kinetic behavior of a node within a nuclear reactor system.
      """
      def __init__(self,
-                    m: float = 0.0,
-                    scp: float = 0.0,
-                    W: float = 0.0,
-                    y0: float = 0.0) -> None:
+                  m: float = 0.0,
+                  scp: float = 0.0,
+                  W: float = 0.0,
+                  y0: float = 0.0) -> None:
           self.m = m                 # mass (kg)
           self.scp = scp             # specific heat capacity (J/(kg*°K))
           self.W = W                 # mass flow rate (kg/s)
@@ -153,12 +153,15 @@ class Node:
           '''
           Energy from advective heat transfer
           source: source node (node or constant)
-          dumped: if 'from node' is a constant (indicates dumping instead of 
-                    recirculation), this needs to be set to true
           '''
-          # reset in case of update
-          self.dTdt_advective = 0.0
-          self.dTdt_advective = (source-self.y())*self.W/self.m
+
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.dTdt_advective = 0.0
+               self.dTdt_advective = (source-self.y())*self.W/self.m
+          else:
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
 
      def set_dTdt_internal(self, source: callable, k: float):
@@ -167,9 +170,13 @@ class Node:
           source: source of generation (state variable y(i))
           k: constant of proportionality 
           '''
-          # reset in case of update
-          self.dTdt_internal = 0.0
-          self.dTdt_internal = k*source/(self.m*self.scp)
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.dTdt_internal = 0.0
+               self.dTdt_internal = k*source/(self.m*self.scp)
+          else:
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def set_dTdt_convective(self, source: list, hA: list):
           '''
@@ -178,10 +185,14 @@ class Node:
           hA: (list of state variable(s) y(i)) convective heat transfer 
                coefficient(s) * wetted area(s) (MW/C)
           '''
-          # reset in case of update
-          self.dTdt_convective = 0.0
-          for i in range(len(source)):
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.dTdt_convective = 0.0
+               for i in range(len(source)):
                     self.dTdt_convective += hA[i]*(source[i]-self.y())/(self.m*self.scp)
+          else:
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def set_dndt(self, r: y, beta_eff: float, Lambda: float, lam: list, C: list):
           '''
@@ -192,12 +203,16 @@ class Node:
           lam: decay constants for associated precursor groups
           C: precursor groups (list of state variables y(i))
           '''
-          # reset in case of update
-          self.dndt = 0.0
-          precursors = 0.0
-          for g in enumerate(lam):
-               precursors += g[1]*C[g[0]]
-          self.dndt = (r-beta_eff)*self.y()/Lambda + precursors
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.dndt = 0.0
+               precursors = 0.0
+               for g in enumerate(lam):
+                    precursors += g[1]*C[g[0]]
+               self.dndt = (r-beta_eff)*self.y()/Lambda + precursors
+          else:
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def set_dcdt(self, 
                n: float, 
@@ -222,19 +237,23 @@ class Node:
           Raises:
           - ValueError: if flow is True and either t_c or t_l are not set properly.
           '''
-          # reset in case of update
-          self.dcdt = 0.0
-          source = n * beta / Lambda
-          decay = lam * self.y()
-          if flow:
-               if (t_c <= 0) or (t_l <= 0):
-                    raise ValueError("When flow is True, both 't_c' (core transit time) and 't_l' (loop transit time) must \
-                                        be greater than 0 to avoid division by zero.")
-               outflow = self.y() / t_c
-               inflow = self.y(t-t_l) * np.exp(-lam * t_l) / t_c
-               self.dcdt = source - decay - outflow + inflow
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.dcdt = 0.0
+               source = n * beta / Lambda
+               decay = lam * self.y()
+               if flow:
+                    if (t_c <= 0) or (t_l <= 0):
+                         raise ValueError("When flow is True, both 't_c' (core transit time) and 't_l' (loop transit time) must\
+                                           be greater than 0 to avoid division by zero.")
+                    outflow = self.y() / t_c
+                    inflow = self.y(t-t_l) * np.exp(-lam * t_l) / t_c
+                    self.dcdt = source - decay - outflow + inflow
+               else:
+                    self.dcdt = source - decay
           else:
-               self.dcdt = source - decay
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def set_drdt(self, sources: list, coeffs: list):
           '''
@@ -242,12 +261,16 @@ class Node:
           sources: list of derivatives of feedback sources (dy(i)/dt)
           coeffs: list of respective feedback coefficients
           '''
-          # reset in case of update
-          self.drdt = 0.0
-          fb = 0.0
-          for s in enumerate(sources):
-               fb += s[1]*coeffs[s[0]]
-          self.drdt = fb
+          #check that node has been added to the system
+          if self.y:
+               # reset in case of update
+               self.drdt = 0.0
+               fb = 0.0
+               for s in enumerate(sources):
+                    fb += s[1]*coeffs[s[0]]
+               self.drdt = fb
+          else:
+               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def dydt(self):
           y1 = self.dTdt_advective
