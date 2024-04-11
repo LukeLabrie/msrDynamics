@@ -8,42 +8,57 @@ class System:
      '''
      def __init__(self, nodes = None, dydt = None, y0 = None) -> None:
           self.n_nodes = 0
-
+          self.n_inputs = 0
           # avoids using mutable objects as default arguments, which causes a memory leak
           if not nodes:
-               self.nodes = []
+               self.nodes = {}
           if not dydt:
                self.dydt = []
           if not y0:
                self.y0 = []
 
-          self.input = None 
+          self.input_funcs = None 
           self.integrator = None
      
      def add_input(self, input_func, T):
           '''
           adds an input function of time to the integrator
           '''
-          spline = CubicHermiteSpline(n=1)
-          spline.from_function(input_func, times_of_interest = T)
-          self.input = spline
-          return input(0)
+          # store input function for when spline is created 
+          if self.input_funcs:
+               self.input_funcs.append(input_func)
+          else:
+               self.input_funcs = [input_func]
+
+          # return jitcdde input object so it can be used for sympy expressions
+          input_obj = input(self.n_inputs)
+          self.n_inputs += 1
+          return input_obj
      
-     def _finalize(self):
+     def _get_full_input(self,times):
+          return [f(times) for f in self.input_funcs]
+     
+     def _finalize(self, T):
           '''
           initiates and returns JiTCDDE integrator 
           '''
           if (self.integrator): 
                self.integrator = None
-          if (self.input):
-               self.dydt = [n.dTdt_advective + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
-               self.y0 = [n.y0 for n in self.nodes]
+          if (self.input_funcs):
+               # set up system matrix
+               self.dydt = [n.dydt() for n in self.nodes.values()]
+               self.y0 = [n.y0 for n in self.nodes.values()]
+
+               # set up input spline
+               spline = CubicHermiteSpline(n = self.n_inputs) 
+               spline.from_function(self._get_full_input, times_of_interest = T)
+               self.input = spline
                DDE = jitcdde_input(self.dydt,self.input)
                DDE.constant_past(self.y0)
                self.integrator = DDE
           else:
-               self.dydt = [n.dTdt_advective + n.dTdt_convective + n.dTdt_internal + n.dndt + n.drdt + n.dcdt for n in self.nodes]
-               self.y0 = [n.y0 for n in self.nodes]
+               self.dydt = [n.dydt() for n in self.nodes.values()]
+               self.y0 = [n.y0 for n in self.nodes.values()]
                DDE = jitcdde(self.dydt)
                DDE.constant_past(self.y0)
                self.integrator = DDE
@@ -54,17 +69,21 @@ class System:
           '''
           index = self.n_nodes
           for n in new_nodes: 
-                n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
-                n.index = index
-                self.nodes.append(n)
-                self.n_nodes += 1
-                index += 1
+               n.y = lambda tau=None, i = index: y(i, tau) if tau is not None else y(i)
+               n.index = index
+               # add node to nodes dictionary by name, if available, and by index if not
+               if n.name:
+                    self.nodes[n.name] = n
+               else:
+                    self.nodes[index] = n
+               self.n_nodes += 1
+               index += 1
 
      def get_dydt(self):
           '''
           returns rhs equations of the system
           '''
-          return [n.dydt() for n in self.nodes]
+          return [n.dydt() for n in self.nodes.values()]
      
      def get_state_by_index(self, i: int, j: int):
           '''
@@ -80,12 +99,12 @@ class System:
           solves system and returns np.array() with solution matrix
           '''
           # clear data
-          for n in self.nodes:
+          for n in self.nodes.values():
                if (n.y_out.any()):
                     n.y_out = []
 
           # set integrator 
-          self._finalize()
+          self._finalize(T)
 
           # solution 
           y = []
@@ -95,7 +114,7 @@ class System:
                y.append(self.integrator.integrate(t_x))
 
           # populate node objects with solutions 
-          for s in enumerate(self.nodes):
+          for s in enumerate(self.nodes.values()):
                s[1].y_out = np.array([state[s[0]] for state in y])
 
           return np.array(y)
@@ -130,10 +149,12 @@ class Node:
      The class is designed to model the thermal-hydraulic and neutron-kinetic behavior of a node within a nuclear reactor system.
      """
      def __init__(self,
+                  name: str = None,
                   m: float = 0.0,
                   scp: float = 0.0,
                   W: float = 0.0,
                   y0: float = 0.0) -> None:
+          self.name = name           # node name
           self.m = m                 # mass (kg)
           self.scp = scp             # specific heat capacity (J/(kg*°K))
           self.W = W                 # mass flow rate (kg/s)
