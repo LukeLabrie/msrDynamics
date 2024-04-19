@@ -24,7 +24,7 @@ python -m pip install -e .
 
 ## Methodology 
 
-The API creates nodal systems, of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
+The API creates nodal systems, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system.
 
 ## Usage
 
@@ -78,6 +78,11 @@ f.add_nodes([x,y])
 x.dydt = x.y() - y.y()
 y.dydt = - x.y() + y.y() 
 ```
+
+Helper methods currently encompass the following effects:
+- Point kinetics, including modified point kinetics for MSRs
+- Convective heat transfer
+- Advective heat transfer (mass flow)
 
 ## Simple Example
 
