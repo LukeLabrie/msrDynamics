@@ -7,11 +7,18 @@ but can be extended to other fission and/or thermal hydraulic systems. The goal 
 
 ## Installation
 
-Clone this repository. Then, within your preferred python environment, install the project with pip by providing the path to the project folder. 
+The project can be installed with pip from your preferred python environment. 
+
 ```
-pip install </path/to/msrDynamics>
+python -m pip install msrDynamics
 ```
-The project is not yet available on PyPI. 
+
+If you plan on making changes to the source code, install in developer mode. 
+
+```
+python -m pip install -e msrDynamics
+```
+
 
 ## Methodology 
 
