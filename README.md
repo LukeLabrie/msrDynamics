@@ -5,10 +5,6 @@ a delay differential equation solver, written with emulation of simulink-style s
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
 but can be extended to other fission and/or thermal hydraulic systems. The goal of this package is to streamline the implemetation of such nodal models for more complex systems, where direct handling of the equations can become cumbersome. 
 
-Comparison of results from the [Molten Salt Reactor Experiment](https://en.wikipedia.org/wiki/Molten-Salt_Reactor_Experiment) (MSRE) generated with `msrDynamics` against experimental data, and similar work by [Singh et al.](https://doi.org/10.1016/j.anucene.2017.10.047)
- ![](figures/step_insertion_5MW.png) 
-
-
 ## Installation
 
 Clone this repository. Then, within your preferred python environment, install the project with pip by providing the path to the project folder. 
@@ -81,3 +77,6 @@ See the notebooks below for more detailed examples of usage, as well as comparis
 - [Simple Reactor](./examples/toy_reactor)
 - [Aircraft Reactor Experiment](./examples/are)
 - [Molten Salt Reactor Experiment](./examples/msre)
+
+Comparison of results from the [Molten Salt Reactor Experiment](https://en.wikipedia.org/wiki/Molten-Salt_Reactor_Experiment) (MSRE) generated with `msrDynamics` against experimental data, and similar work by [Singh et al.](https://doi.org/10.1016/j.anucene.2017.10.047)
+ ![](figures/step_insertion_5MW.png) 
