@@ -75,7 +75,7 @@ y.dydt = - x.y() + y.y()
 The diagram below describes a simple MSR system. The notebook for the example below can be found in 
 [examples/toyModel.ipynb](./examples/toyModel.ipynb).
 
-![msr_diagram](toyModel.drawio.png)
+![msr_diagram](figures/toyModel.drawio.png)
 
 First, `Node` and `System` objects are instantiated, with relevant parameters to describe the state of the node. Note, the parameters for this example are mostly borrowed from the Aircraft Reactor Experiment (ARE), see [examples/are](./examples/are).
 
