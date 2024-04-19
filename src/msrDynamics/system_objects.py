@@ -1,6 +1,7 @@
 from jitcdde import jitcdde, y, t, jitcdde_input, input
 import numpy as np
 from chspy import CubicHermiteSpline
+import sympy as sp
 
 class System:
      '''
@@ -38,7 +39,7 @@ class System:
      def _get_full_input(self,times):
           return [f(times) for f in self.input_funcs]
      
-     def _finalize(self, T):
+     def _finalize(self, T, sdd, md):
           '''
           initiates and returns JiTCDDE integrator 
           '''
@@ -53,13 +54,25 @@ class System:
                spline = CubicHermiteSpline(n = self.n_inputs) 
                spline.from_function(self._get_full_input, times_of_interest = T)
                self.input = spline
-               DDE = jitcdde_input(self.dydt,self.input)
+
+               # max delay needs to be provided in the case of state-dependent delays
+               if sdd:
+                    DDE = jitcdde_input(self.dydt,self.input, max_delay = md)
+               else:
+                    DDE = jitcdde_input(self.dydt,self.input)
+
                DDE.constant_past(self.y0)
                self.integrator = DDE
           else:
                self.dydt = [n.dydt() for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
-               DDE = jitcdde(self.dydt)
+
+               # max delay needs to be provided in the case of state-dependent delays
+               if sdd:
+                    DDE = jitcdde(self.dydt, max_delay = md)
+               else:
+                    DDE = jitcdde(self.dydt)
+
                DDE.constant_past(self.y0)
                self.integrator = DDE
      
@@ -94,9 +107,12 @@ class System:
           deriv = self.integrator.get_state()[j][2][i]
           return (val,deriv)
                
-     def solve(self, T: list):
+     def solve(self, T: list, sdd: bool = False, max_delay: float = 1e10):
           '''
           solves system and returns np.array() with solution matrix
+          T: time array
+          sdd: State-dependent delays
+          max_delay: max delay
           '''
           # clear data
           for n in self.nodes.values():
@@ -104,7 +120,7 @@ class System:
                     n.y_out = []
 
           # set integrator 
-          self._finalize(T)
+          self._finalize(T, sdd, max_delay)
 
           # solution 
           y = []
@@ -265,11 +281,8 @@ class Node:
                source = n * beta / Lambda
                decay = lam * self.y()
                if flow:
-                    if (t_c <= 0) or (t_l <= 0):
-                         raise ValueError("When flow is True, both 't_c' (core transit time) and 't_l' (loop transit time) must\
-                                           be greater than 0 to avoid division by zero.")
                     outflow = self.y() / t_c
-                    inflow = self.y(t-t_l) * np.exp(-lam * t_l) / t_c
+                    inflow = self.y(t-t_l) * sp.exp(-lam * t_l) / t_c
                     self.dcdt = source - decay - outflow + inflow
                else:
                     self.dcdt = source - decay
