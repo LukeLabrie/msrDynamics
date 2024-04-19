@@ -13,10 +13,12 @@ The project can be installed with pip from your preferred python environment.
 python -m pip install msrDynamics
 ```
 
-If you plan on making changes to the source code, install in developer mode. 
+If you plan on making changes to the source code, clone the repository, and install in developer mode. 
 
 ```
-python -m pip install -e msrDynamics
+git clone https://github.com/LukeLabrie/msrDynamics.git
+cd msrDynamics
+python -m pip install -e .
 ```
 
 
