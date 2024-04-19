@@ -1,9 +1,12 @@
 # msrDynamics
 
-msrDynamics is an object-oriented API to [JiTCDDE](https://github.com/neurophysik/jitcdde), 
+`msrDynamics` is an object-oriented API to [JiTCDDE](https://github.com/neurophysik/jitcdde), 
 a delay differential equation solver, written with emulation of simulink-style solvers for
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
 but can be extended to other fission and/or thermal hydraulic systems. The goal of this package is to streamline the implemetation of such nodal models for more complex systems, where direct handling of the equations can become cumbersome. 
+
+Comparison of results generated with `msrDynamics` against similar work by [Singh et al.](https://doi.org/10.1016/j.anucene.2017.10.047)
+![figures/step_insertion_1MW.png] | ![figures/step_insertion_5MW.png] | ![figures/step_insertion_8MW.png] 
 
 
 ## Installation
@@ -72,6 +75,8 @@ y.dydt = - x.y() + y.y()
 ```
 
 ## Examples
+
+See the notebooks below for more detailed examples of usage, as well as comparison to experimental data.
 
 - [Simple Reactor](./examples/toy_reactor)
 - [Aircraft Reactor Experiment](./examples/are)
