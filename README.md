@@ -6,7 +6,7 @@ molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.science
 but can be extended to other fission and/or thermal hydraulic systems. The goal of this package is to streamline the implemetation of such nodal models for more complex systems, where direct handling of the equations can become cumbersome. 
 
 Comparison of results generated with `msrDynamics` against similar work by [Singh et al.](https://doi.org/10.1016/j.anucene.2017.10.047)
-![](figures/step_insertion_1MW.png) | ![](figures/step_insertion_5MW.png) | ![](figures/step_insertion_8MW.png) 
+![](figures/step_insertion_1MW.png | width = 50) ![](figures/step_insertion_5MW.png | width = 50) ![](figures/step_insertion_8MW.png | width = 50) 
 
 
 ## Installation
