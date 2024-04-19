@@ -73,6 +73,6 @@ y.dydt = - x.y() + y.y()
 
 ## Examples
 
-[Simple Reactor](./examples/toy_reactor)
-[Aircraft Reactor Experiment](./examples/are)
-[Molten Salt Reactor Experiment](./examples/msre)
+- [Simple Reactor](./examples/toy_reactor)
+- [Aircraft Reactor Experiment](./examples/are)
+- [Molten Salt Reactor Experiment](./examples/msre)
