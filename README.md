@@ -170,7 +170,7 @@ sol_jit = MSR.solve(T)
 
 Results for the above system are shown below. 
 
-![msr_diagram](toyPlot.png)
+![msr_diagram](figures/toyPlot.png)
 
 Solutions can be accessed from the `y_out` attribute of the associated node. The snippet below is used for the plot above. 
 
