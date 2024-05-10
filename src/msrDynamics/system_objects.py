@@ -47,7 +47,7 @@ class System:
                self.integrator = None
           if (self.input_funcs):
                # set up system matrix
-               self.dydt = [n.dydt() for n in self.nodes.values()]
+               self.dydt = [n.get_dydt() for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
 
                # set up input spline
@@ -55,24 +55,28 @@ class System:
                spline.from_function(self._get_full_input, times_of_interest = T)
                self.input = spline
 
+               DDE = jitcdde_input(self.dydt,self.input)
+               DDE.step_on_discontinuities()
+
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
-                    DDE = jitcdde_input(self.dydt,self.input, max_delay = md)
-               else:
-                    DDE = jitcdde_input(self.dydt,self.input)
+                    DDE.max_delay = md
 
+               # set initial conditions
                DDE.constant_past(self.y0)
                self.integrator = DDE
           else:
-               self.dydt = [n.dydt() for n in self.nodes.values()]
+               self.dydt = [n.get_dydt() for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
+
+               DDE = jitcdde(self.dydt, max_delay = md)
+               DDE.step_on_discontinuities()
 
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
-                    DDE = jitcdde(self.dydt, max_delay = md)
-               else:
-                    DDE = jitcdde(self.dydt)
+                    DDE.max_delay = md
 
+               # set initial conditions
                DDE.constant_past(self.y0)
                self.integrator = DDE
      
@@ -96,7 +100,7 @@ class System:
           '''
           returns rhs equations of the system
           '''
-          return [n.dydt() for n in self.nodes.values()]
+          return [n.get_dydt() for n in self.nodes.values()]
      
      def get_state_by_index(self, i: int, j: int):
           '''
@@ -182,6 +186,7 @@ class Node:
           self.dcdt = 0.0            # sym. expression for dc/dt (c = precursor concentration)
           self.drdt = 0.0            # sym. expression for dr/dt (r = reactivity)
           self.y = None              # JiTCDDE state variable object, to be assigned by System
+          self.dydt = 0.0            # sym. expression for user-defined dynamics
           self.index = None          # JiTCDDE state variable index, to be assigned by System
           self.y_out = np.array([])  # solution data, to be populated by System
           self.y_rhs = np.array([])  # solution data, to be populated by System
@@ -306,11 +311,12 @@ class Node:
           else:
                raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
-     def dydt(self):
+     def get_dydt(self):
           y1 = self.dTdt_advective
           y2 = self.dTdt_internal
           y3 = self.dTdt_convective
           y4 = self.dndt
           y5 = self.dcdt
           y6 = self.drdt
-          return y1 + y2 + y3 + y4 + y5 + y6
+          y7 = self.dydt
+          return y1 + y2 + y3 + y4 + y5 + y6 + y7
