@@ -56,7 +56,6 @@ class System:
                self.input = spline
 
                DDE = jitcdde_input(self.dydt,self.input)
-               DDE.step_on_discontinuities()
 
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
@@ -64,13 +63,13 @@ class System:
 
                # set initial conditions
                DDE.constant_past(self.y0)
+               DDE.step_on_discontinuities()
                self.integrator = DDE
           else:
                self.dydt = [n.get_dydt() for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
 
                DDE = jitcdde(self.dydt, max_delay = md)
-               DDE.step_on_discontinuities()
 
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
@@ -78,6 +77,7 @@ class System:
 
                # set initial conditions
                DDE.constant_past(self.y0)
+               DDE.step_on_discontinuities()
                self.integrator = DDE
      
      def add_nodes(self, new_nodes: list):
