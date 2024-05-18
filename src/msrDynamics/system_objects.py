@@ -63,7 +63,6 @@ class System:
 
                # set initial conditions
                DDE.constant_past(self.y0)
-               DDE.step_on_discontinuities()
                self.integrator = DDE
           else:
                self.dydt = [n.get_dydt() for n in self.nodes.values()]
