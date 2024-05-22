@@ -242,6 +242,10 @@ class Node:
           if self.y:
                # reset in case of update
                self.dTdt_convective = 0.0
+               
+               # make sure there is an associated coefficient for each source
+               if len(source) != len(hA):
+                    raise ValueError("Source array and coefficient array different lengths")
                for i in range(len(source)):
                     self.dTdt_convective += hA[i]*(source[i]-self.y())/(self.m*self.scp)
           else:
