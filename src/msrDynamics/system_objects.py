@@ -39,7 +39,7 @@ class System:
      def _get_full_input(self,times):
           return [f(times) for f in self.input_funcs]
      
-     def _finalize(self, T, sdd, md):
+     def finalize(self, T, sdd, md):
           '''
           initiates and returns JiTCDDE integrator 
           '''
@@ -47,7 +47,7 @@ class System:
                self.integrator = None
           if (self.input_funcs):
                # set up system matrix
-               self.dydt = [n.get_dydt() for n in self.nodes.values()]
+               self.dydt = [n.dydt for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
 
                # set up input spline
@@ -56,7 +56,6 @@ class System:
                self.input = spline
 
                DDE = jitcdde_input(self.dydt,self.input)
-               DDE.step_on_discontinuities()
 
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
@@ -66,11 +65,10 @@ class System:
                DDE.constant_past(self.y0)
                self.integrator = DDE
           else:
-               self.dydt = [n.get_dydt() for n in self.nodes.values()]
+               self.dydt = [n.dydt for n in self.nodes.values()]
                self.y0 = [n.y0 for n in self.nodes.values()]
 
                DDE = jitcdde(self.dydt, max_delay = md)
-               DDE.step_on_discontinuities()
 
                # max delay needs to be provided in the case of state-dependent delays
                if sdd:
@@ -78,6 +76,7 @@ class System:
 
                # set initial conditions
                DDE.constant_past(self.y0)
+               # DDE.step_on_discontinuities()
                self.integrator = DDE
      
      def add_nodes(self, new_nodes: list):
@@ -124,7 +123,7 @@ class System:
                     n.y_out = []
 
           # set integrator 
-          self._finalize(T, sdd, max_delay)
+          self.finalize(T, sdd, max_delay)
 
           # solution 
           y = []
@@ -174,22 +173,34 @@ class Node:
                   scp: float = 0.0,
                   W: float = 0.0,
                   y0: float = 0.0) -> None:
-          self.name = name           # node name
-          self.m = m                 # mass (kg)
-          self.scp = scp             # specific heat capacity (J/(kg*°K))
-          self.W = W                 # mass flow rate (kg/s)
-          self.y0 = y0               # initial temperature (°K)
-          self.dTdt_advective = 0.0  # sym. expression for advective heat flow (°K/s)
-          self.dTdt_internal = 0.0   # sym. expression for internal heat generation (°K/s)
-          self.dTdt_convective = 0.0 # sym. expression for convective heat flow (°K/s)
-          self.dndt = 0.0            # sym. expression for dn/dt (n = neutron population)
-          self.dcdt = 0.0            # sym. expression for dc/dt (c = precursor concentration)
-          self.drdt = 0.0            # sym. expression for dr/dt (r = reactivity)
-          self.y = None              # JiTCDDE state variable object, to be assigned by System
-          self.dydt = 0.0            # sym. expression for user-defined dynamics
-          self.index = None          # JiTCDDE state variable index, to be assigned by System
-          self.y_out = np.array([])  # solution data, to be populated by System
-          self.y_rhs = np.array([])  # solution data, to be populated by System
+          self.name = name            # node name
+          self.m = m                  # mass (kg)
+          self.scp = scp              # specific heat capacity (J/(kg*°K))
+          self.W = W                  # mass flow rate (kg/s)
+          self.y0 = y0                # initial temperature (°K)
+          self.dTdt_advective = 0.0   # sym. expression for advective heat flow (°K/s)
+          self.dTdt_internal = 0.0    # sym. expression for internal heat generation (°K/s)
+          self.dTdt_convective = 0.0  # sym. expression for convective heat flow (°K/s)
+          self.dndt = 0.0             # sym. expression for dn/dt (n = neutron population)
+          self.dcdt = 0.0             # sym. expression for dc/dt (c = precursor concentration)
+          self.drdt = 0.0             # sym. expression for dr/dt (r = reactivity)
+          self.y = None               # JiTCDDE state variable object, to be assigned by System
+          self.index = None           # JiTCDDE state variable index, to be assigned by System
+          self.y_out = np.array([])   # solution data, to be populated by System
+          self.y_rhs = np.array([])   # solution data, to be populated by System
+
+     # TODO
+     # separate nodes into neutronics node and thermal node
+
+     @property
+     def dydt(self):
+          y1 = self.dTdt_advective
+          y2 = self.dTdt_internal
+          y3 = self.dTdt_convective
+          y4 = self.dndt
+          y5 = self.dcdt
+          y6 = self.drdt
+          return y1 + y2 + y3 + y4 + y5 + y6 
 
      def set_dTdt_advective(self, source):
           '''
@@ -310,13 +321,3 @@ class Node:
                self.drdt = fb
           else:
                raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-
-     def get_dydt(self):
-          y1 = self.dTdt_advective
-          y2 = self.dTdt_internal
-          y3 = self.dTdt_convective
-          y4 = self.dndt
-          y5 = self.dcdt
-          y6 = self.drdt
-          y7 = self.dydt
-          return y1 + y2 + y3 + y4 + y5 + y6 + y7
