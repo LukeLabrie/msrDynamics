@@ -2,6 +2,7 @@ from jitcdde import jitcdde, y, t, jitcdde_input, input
 import numpy as np
 from chspy import CubicHermiteSpline
 import sympy as sp
+import warnings
 
 class System:
      '''
@@ -39,7 +40,10 @@ class System:
      def _get_full_input(self,times):
           return [f(times) for f in self.input_funcs]
      
-     def finalize(self, T, sdd, md):
+     def finalize(self, T, 
+                  sdd: bool = False, 
+                  md: float = 1e10, 
+                  custom_past: bool = False):
           '''
           initiates and returns JiTCDDE integrator 
           '''
@@ -48,7 +52,6 @@ class System:
           if (self.input_funcs):
                # set up system matrix
                self.dydt = [n.dydt for n in self.nodes.values()]
-               self.y0 = [n.y0 for n in self.nodes.values()]
 
                # set up input spline
                spline = CubicHermiteSpline(n = self.n_inputs) 
@@ -62,11 +65,13 @@ class System:
                     DDE.max_delay = md
 
                # set initial conditions
-               DDE.constant_past(self.y0)
+               if not (custom_past):
+                    self.y0 = [n.y0 for n in self.nodes.values()]
+                    DDE.constant_past(self.y0)
+
                self.integrator = DDE
           else:
                self.dydt = [n.dydt for n in self.nodes.values()]
-               self.y0 = [n.y0 for n in self.nodes.values()]
 
                DDE = jitcdde(self.dydt, max_delay = md)
 
@@ -75,8 +80,10 @@ class System:
                     DDE.max_delay = md
 
                # set initial conditions
-               DDE.constant_past(self.y0)
-               DDE.step_on_discontinuities()
+               if not (custom_past):
+                    self.y0 = [n.y0 for n in self.nodes.values()]
+                    DDE.constant_past(self.y0)
+               # DDE.step_on_discontinuities()
                self.integrator = DDE
      
      def add_nodes(self, new_nodes: list):
@@ -110,7 +117,10 @@ class System:
           deriv = self.integrator.get_state()[j][2][i]
           return (val,deriv)
                
-     def solve(self, T: list, sdd: bool = False, max_delay: float = 1e10):
+     def solve(self, T: list, 
+               sdd: bool = False, 
+               max_delay: float = 1e10,
+               custom_past: bool = False):
           '''
           solves system and returns np.array() with solution matrix
           T: time array
@@ -123,7 +133,7 @@ class System:
                     n.y_out = []
 
           # set integrator 
-          self.finalize(T, sdd, max_delay)
+          self.finalize(T, sdd, max_delay, custom_past)
 
           # solution 
           y = []
@@ -168,39 +178,37 @@ class Node:
      The class is designed to model the thermal-hydraulic and neutron-kinetic behavior of a node within a nuclear reactor system.
      """
      def __init__(self,
-                  name: str = None,
-                  m: float = 0.0,
-                  scp: float = 0.0,
-                  W: float = 0.0,
-                  y0: float = 0.0) -> None:
+                    name: str = None,
+                    m: float = 0.0,
+                    scp: float = 0.0,
+                    W: float = 0.0,
+                    y0: float = 0.0) -> None:
           self.name = name            # node name
           self.m = m                  # mass (kg)
           self.scp = scp              # specific heat capacity (J/(kg*°K))
           self.W = W                  # mass flow rate (kg/s)
           self.y0 = y0                # initial temperature (°K)
-          self.dTdt_advective = 0.0   # sym. expression for advective heat flow (°K/s)
-          self.dTdt_internal = 0.0    # sym. expression for internal heat generation (°K/s)
-          self.dTdt_convective = 0.0  # sym. expression for convective heat flow (°K/s)
-          self.dndt = 0.0             # sym. expression for dn/dt (n = neutron population)
-          self.dcdt = 0.0             # sym. expression for dc/dt (c = precursor concentration)
-          self.drdt = 0.0             # sym. expression for dr/dt (r = reactivity)
+          self.dTdt_advective = None  # sym. expression for advective heat flow (°K/s)
+          self.dTdt_internal = None   # sym. expression for internal heat generation (°K/s)
+          self.dTdt_convective = None # sym. expression for convective heat flow (°K/s)
+          self.dndt = None            # sym. expression for dn/dt (n = neutron population)
+          self.dcdt = None            # sym. expression for dc/dt (c = precursor concentration)
+          self.drdt = None            # sym. expression for dr/dt (r = reactivity)
+          self._dydt = None           # sym. expression for user-defined dynamics 
           self.y = None               # JiTCDDE state variable object, to be assigned by System
           self.index = None           # JiTCDDE state variable index, to be assigned by System
           self.y_out = np.array([])   # solution data, to be populated by System
           self.y_rhs = np.array([])   # solution data, to be populated by System
-
-     # TODO
-     # separate nodes into neutronics node and thermal node
-
+    
      @property
      def dydt(self):
-          y1 = self.dTdt_advective
-          y2 = self.dTdt_internal
-          y3 = self.dTdt_convective
-          y4 = self.dndt
-          y5 = self.dcdt
-          y6 = self.drdt
-          return y1 + y2 + y3 + y4 + y5 + y6 
+          return self.dTdt_advective + self.dTdt_internal + \
+                 self.dTdt_convective + self.dndt + self.dcdt + self.drdt + \
+                 self._dydt
+     
+     @dydt.setter
+     def dydt(self, custom_dydt):
+          self._dydt = custom_dydt
 
      def set_dTdt_advective(self, source):
           '''
@@ -208,14 +216,19 @@ class Node:
           source: source node (node or constant)
           '''
 
+          # check not to mix thermal and point-kinetic equations
+          if self.dndt or self.dcdt or self.drdt:
+               raise ValueError('''This node has already been assigned 
+                                point-kinetic dynamics''')
+          
           #check that node has been added to the system
           if self.y:
                # reset in case of update
                self.dTdt_advective = 0.0
                self.dTdt_advective = (source-self.y())*self.W/self.m
           else:
-               raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-
+               raise ValueError('''Nodes need to be added to a System() object 
+                                before setting dynamics.''')
 
      def set_dTdt_internal(self, source: callable, k: float):
           '''
@@ -223,6 +236,12 @@ class Node:
           source: source of generation (state variable y(i))
           k: constant of proportionality 
           '''
+
+          # check not to mix thermal and point-kinetic equations
+          if self.dndt or self.dcdt or self.drdt:
+               raise ValueError('''This node has already been assigned 
+                                point-kinetic dynamics''')
+          
           #check that node has been added to the system
           if self.y:
                # reset in case of update
@@ -238,6 +257,11 @@ class Node:
           hA: (list of state variable(s) y(i)) convective heat transfer 
                coefficient(s) * wetted area(s) (MW/C)
           '''
+          # check not to mix thermal and point-kinetic equations
+          if self.dndt or self.dcdt or self.drdt:
+               raise ValueError('''This node has already been assigned 
+                                point-kinetic dynamics''')
+          
           #check that node has been added to the system
           if self.y:
                # reset in case of update
@@ -260,6 +284,15 @@ class Node:
           lam: decay constants for associated precursor groups
           C: precursor groups (list of state variables y(i))
           '''
+          # check not to mix thermal and point-kinetic equations
+          if self.dTdt_advective or \
+             self.dTdt_internal or \
+             self.dTdt_convective or \
+             self.drdt or \
+             self.dcdt:
+               raise ValueError('''This node has already been assigned 
+                                incompatible dynamics''')
+          
           #check that node has been added to the system
           if self.y:
                # reset in case of update
@@ -272,7 +305,7 @@ class Node:
                raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
      def set_dcdt(self, 
-               n: float, 
+               n: y, 
                beta: float, 
                Lambda: float, 
                lam: float, 
@@ -294,6 +327,14 @@ class Node:
           Raises:
           - ValueError: if flow is True and either t_c or t_l are not set properly.
           '''
+          # check not to mix thermal and point-kinetic equations
+          if self.dTdt_advective or \
+             self.dTdt_internal or \
+             self.dTdt_convective or \
+             self.drdt or \
+             self.dndt:
+               raise ValueError('''This node has already been assigned 
+                                incompatible dynamics''')
           #check that node has been added to the system
           if self.y:
                # reset in case of update
@@ -315,6 +356,14 @@ class Node:
           sources: list of derivatives of feedback sources (dy(i)/dt)
           coeffs: list of respective feedback coefficients
           '''
+          # check not to mix thermal and point-kinetic equations
+          if self.dTdt_advective or \
+             self.dTdt_internal or \
+             self.dTdt_convective or \
+             self.dndt or \
+             self.dcdt:
+               raise ValueError('''This node has already been assigned 
+                                incompatible dynamics''')
           #check that node has been added to the system
           if self.y:
                # reset in case of update
