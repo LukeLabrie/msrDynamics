@@ -1,6 +1,7 @@
 from jitcdde import jitcdde, y, t, jitcdde_input, input
 import numpy as np
 from chspy import CubicHermiteSpline
+from chspy._chspy import solve_from_anchors
 import sympy as sp
 import warnings
 
@@ -21,6 +22,8 @@ class System:
 
           self.input_funcs = None 
           self.integrator = None
+          self.trip_conditions = None
+          self.custom_past = None
      
      def add_input(self, input_func, T):
           '''
@@ -37,54 +40,63 @@ class System:
           self.n_inputs += 1
           return input_obj
      
+     def add_trip_conditions(self, indicies, bounds):
+          self.trip_conditions = {}
+          self.trip_conditions['indicies'] = indicies
+          self.trip_conditions['bounds'] = bounds 
+     
      def _get_full_input(self,times):
           return [f(times) for f in self.input_funcs]
      
+     def set_custom_past(self, past: CubicHermiteSpline, t_truncate = None):
+          if (t_truncate):
+               past.truncate(t_truncate)
+          self.custom_past = past
+
+     
      def finalize(self, T, 
                   sdd: bool = False, 
-                  md: float = 1e10, 
-                  custom_past: bool = False):
+                  md: float = 1e10):
           '''
-          initiates and returns JiTCDDE integrator 
+          instantializes and stores JiTCDDE integrator. Can be used for direct 
+          accesss to JiTCDDE integrator object 
           '''
           if (self.integrator): 
                self.integrator = None
+          # set up system matrix
+          self.dydt = [n.dydt for n in self.nodes.values()]
           if (self.input_funcs):
-               # set up system matrix
-               self.dydt = [n.dydt for n in self.nodes.values()]
-
                # set up input spline
                spline = CubicHermiteSpline(n = self.n_inputs) 
                spline.from_function(self._get_full_input, times_of_interest = T)
                self.input = spline
-
+               # instantiate integrator
                DDE = jitcdde_input(self.dydt,self.input)
-
-               # max delay needs to be provided in the case of state-dependent delays
-               if sdd:
-                    DDE.max_delay = md
-
                # set initial conditions
-               if not (custom_past):
+               if not (self.custom_past):
                     self.y0 = [n.y0 for n in self.nodes.values()]
                     DDE.constant_past(self.y0)
+               else:
+                    DDE.purge_past()
+                    # shift past time to end at t = 0
+                    t_last = self.custom_past[-1].time
+                    for a in self.custom_past:
+                         a.time -= t_last
+                    DDE.add_past_points(self.custom_past)
 
-               self.integrator = DDE
           else:
-               self.dydt = [n.dydt for n in self.nodes.values()]
-
                DDE = jitcdde(self.dydt, max_delay = md)
-
-               # max delay needs to be provided in the case of state-dependent delays
-               if sdd:
-                    DDE.max_delay = md
-
                # set initial conditions
                if not (custom_past):
                     self.y0 = [n.y0 for n in self.nodes.values()]
                     DDE.constant_past(self.y0)
-               # DDE.step_on_discontinuities()
-               self.integrator = DDE
+               else:
+                    DDE.add_past_points(custom_past)
+
+          # max delay needs to be provided in the case of state-dependent delays
+          if sdd:
+               DDE.max_delay = md
+          self.integrator = DDE
      
      def add_nodes(self, new_nodes: list):
           '''
@@ -116,11 +128,26 @@ class System:
           val = self.integrator.get_state()[j][1][i]
           deriv = self.integrator.get_state()[j][2][i]
           return (val,deriv)
+     
+     def _check_trip(self,state,bounds):
+          '''
+          Returns true if the state variables referenced by the indicies fall outside
+          of the bounds 
+          '''
+          for idx, s in enumerate(state):
+               bounds_s = bounds[idx]
+               min_s = bounds_s[0]
+               max_s = bounds_s[1]
+               if (s < min_s):
+                    return (idx, min_s)
+               elif (s > max_s):
+                    return (idx, max_s)
+          return None
                
-     def solve(self, T: list, 
+     def solve(self, 
+               T: list, 
                sdd: bool = False, 
-               max_delay: float = 1e10,
-               custom_past: bool = False):
+               max_delay: float = 1e10):
           '''
           solves system and returns np.array() with solution matrix
           T: time array
@@ -133,7 +160,7 @@ class System:
                     n.y_out = []
 
           # set integrator 
-          self.finalize(T, sdd, max_delay, custom_past)
+          self.finalize(T, sdd, max_delay)
 
           # solution 
           y = []
@@ -141,6 +168,26 @@ class System:
           # integrate
           for t_x in T:
                y.append(self.integrator.integrate(t_x))
+
+               # handle trip case if given 
+               if self.trip_conditions:
+                    states = [y[-1][i] for i in self.trip_conditions['indicies']]
+                    tripped = self._check_trip(states,self.trip_conditions['bounds'])
+                    if tripped:
+                         self.trip_conditions['tripped_idx'] = self.trip_conditions['indicies'][tripped[0]]
+                         self.trip_conditions['tripped_val'] = tripped[1]
+                         # calculate trip time
+                         window = 1
+                         trip_sol = []
+                         while not trip_sol:
+                              sol_temp = solve_from_anchors((self.integrator.get_state()[-1-window],
+                                                             self.integrator.get_state()[-1]),
+                                                             self.trip_conditions['tripped_idx'],
+                                                             self.trip_conditions['tripped_val'])
+                              trip_sol = sol_temp
+                              window += 1
+                         self.trip_conditions['t_trip'] = trip_sol[0][0]
+                         break
 
           # populate node objects with solutions 
           for s in enumerate(self.nodes.values()):
@@ -188,13 +235,13 @@ class Node:
           self.scp = scp              # specific heat capacity (J/(kg*°K))
           self.W = W                  # mass flow rate (kg/s)
           self.y0 = y0                # initial temperature (°K)
-          self.dTdt_advective = None  # sym. expression for advective heat flow (°K/s)
-          self.dTdt_internal = None   # sym. expression for internal heat generation (°K/s)
-          self.dTdt_convective = None # sym. expression for convective heat flow (°K/s)
-          self.dndt = None            # sym. expression for dn/dt (n = neutron population)
-          self.dcdt = None            # sym. expression for dc/dt (c = precursor concentration)
-          self.drdt = None            # sym. expression for dr/dt (r = reactivity)
-          self._dydt = None           # sym. expression for user-defined dynamics 
+          self.dTdt_advective = 0.0   # sym. expression for advective heat flow (°K/s)
+          self.dTdt_internal = 0.0    # sym. expression for internal heat generation (°K/s)
+          self.dTdt_convective = 0.0  # sym. expression for convective heat flow (°K/s)
+          self.dndt = 0.0             # sym. expression for dn/dt (n = neutron population)
+          self.dcdt = 0.0             # sym. expression for dc/dt (c = precursor concentration)
+          self.drdt = 0.0             # sym. expression for dr/dt (r = reactivity)
+          self._dydt = 0.0            # sym. expression for user-defined dynamics 
           self.y = None               # JiTCDDE state variable object, to be assigned by System
           self.index = None           # JiTCDDE state variable index, to be assigned by System
           self.y_out = np.array([])   # solution data, to be populated by System
