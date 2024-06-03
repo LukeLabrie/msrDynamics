@@ -16,7 +16,7 @@ class System:
           if not nodes:
                self.nodes = {}
           if not dydt:
-               self.dydt = []
+               self._dydt = []
           if not y0:
                self.y0 = []
 
@@ -24,6 +24,14 @@ class System:
           self.integrator = None
           self.trip_conditions = None
           self.custom_past = None
+
+     @property
+     def dydt(self):
+          return [node.dydt for node in self.nodes]
+     
+     @dydt.setter
+     def dydt(self, dydt):
+          self._dydt = dydt
      
      def add_input(self, input_func, T):
           '''
@@ -87,11 +95,15 @@ class System:
           else:
                DDE = jitcdde(self.dydt, max_delay = md)
                # set initial conditions
-               if not (custom_past):
+               if not (self.custom_past):
                     self.y0 = [n.y0 for n in self.nodes.values()]
                     DDE.constant_past(self.y0)
                else:
-                    DDE.add_past_points(custom_past)
+                    # shift past time to end at t = 0
+                    t_last = self.custom_past[-1].time
+                    for a in self.custom_past:
+                         a.time -= t_last
+                    DDE.add_past_points(self.custom_past)
 
           # max delay needs to be provided in the case of state-dependent delays
           if sdd:
@@ -114,12 +126,6 @@ class System:
                self.n_nodes += 1
                index += 1
 
-     def get_dydt(self):
-          '''
-          returns rhs equations of the system
-          '''
-          return [n.get_dydt() for n in self.nodes.values()]
-     
      def get_state_by_index(self, i: int, j: int):
           '''
           returns the state of the i^th state variable at the j^th time index
