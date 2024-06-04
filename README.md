@@ -26,6 +26,15 @@ python -m pip install -e .
 
 The API creates nodal systems, of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
 
+For more detail on this approach and its applications, see:
+- [Ball, 1963](https://digital.library.unt.edu/ark:/67531/metadc1201699/) 
+- [Ball and Kerlin, 1965](https://www.osti.gov/biblio/4591881)
+- [Kerlin, Ball and Steffy, 1971](http://moltensalt.org/references/static/downloads/pdf/ORNL-TM-2571.pdf)
+- [Singh et al., 2017](https://doi.org/10.1016/j.anucene.2017.10.047)
+- [Singh et al., 2018a](https://doi.org/10.1080/00295450.2017.1416879) 
+- [Sing et al., 2018b](https://doi.org/10.1016/j.anucene.2017.10.047)
+- [Sing et al., 2020](https://doi.org/10.1016/j.nucengdes.2019.110457)
+
 ## Usage
 
 Nodes are represented by the `Node()` object which stores properties associated with the node, and contains helper methods to define certian dynamics like convective and advective heat transfer as well as neutron kinetics. For example, fuel flow through a core in direct contact with a moderator material (e.g. graphite), could be set up as follows. 

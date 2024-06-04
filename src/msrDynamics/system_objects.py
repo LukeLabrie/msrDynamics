@@ -27,7 +27,7 @@ class System:
 
      @property
      def dydt(self):
-          return [node.dydt for node in self.nodes]
+          return [node.dydt for node in self.nodes.values()]
      
      @dydt.setter
      def dydt(self, dydt):
@@ -166,34 +166,38 @@ class System:
                     n.y_out = []
 
           # set integrator 
+          print("finalizing integrator...")
           self.finalize(T, sdd, max_delay)
 
           # solution 
           y = []
 
-          # integrate
-          for t_x in T:
-               y.append(self.integrator.integrate(t_x))
-
-               # handle trip case if given 
-               if self.trip_conditions:
+          print("integrating...")
+          if self.trip_conditions:
+          # integrate with trip conditions
+               for t_x in T:
+                    y.append(self.integrator.integrate(t_x))
                     states = [y[-1][i] for i in self.trip_conditions['indicies']]
                     tripped = self._check_trip(states,self.trip_conditions['bounds'])
                     if tripped:
                          self.trip_conditions['tripped_idx'] = self.trip_conditions['indicies'][tripped[0]]
                          self.trip_conditions['tripped_val'] = tripped[1]
+                         print(f"tripped: ({tripped[0]},{tripped[1]})")
                          # calculate trip time
                          window = 1
                          trip_sol = []
                          while not trip_sol:
                               sol_temp = solve_from_anchors((self.integrator.get_state()[-1-window],
-                                                             self.integrator.get_state()[-1]),
-                                                             self.trip_conditions['tripped_idx'],
-                                                             self.trip_conditions['tripped_val'])
+                                                            self.integrator.get_state()[-1]),
+                                                            self.trip_conditions['tripped_idx'],
+                                                            self.trip_conditions['tripped_val'])
                               trip_sol = sol_temp
                               window += 1
                          self.trip_conditions['t_trip'] = trip_sol[0][0]
                          break
+          else:
+               for t_x in T:
+                    y.append(self.integrator.integrate(t_x))
 
           # populate node objects with solutions 
           for s in enumerate(self.nodes.values()):
