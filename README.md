@@ -32,8 +32,8 @@ For more detail on this approach and its applications, see:
 - [Kerlin, Ball and Steffy, 1971](http://moltensalt.org/references/static/downloads/pdf/ORNL-TM-2571.pdf)
 - [Singh et al., 2017](https://doi.org/10.1016/j.anucene.2017.10.047)
 - [Singh et al., 2018a](https://doi.org/10.1080/00295450.2017.1416879) 
-- [Sing et al., 2018b](https://doi.org/10.1016/j.anucene.2017.10.047)
-- [Sing et al., 2020](https://doi.org/10.1016/j.nucengdes.2019.110457)
+- [Singh et al., 2018b](https://doi.org/10.1016/j.anucene.2017.10.047)
+- [Singh et al., 2020](https://doi.org/10.1016/j.nucengdes.2019.110457)
 
 ## Usage
 
