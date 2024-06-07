@@ -3,7 +3,6 @@ import numpy as np
 from chspy import CubicHermiteSpline
 from chspy._chspy import solve_from_anchors
 import sympy as sp
-import warnings
 
 class System:
      '''
@@ -12,14 +11,22 @@ class System:
      def __init__(self, nodes = None, dydt = None, y0 = None) -> None:
           self.n_nodes = 0
           self.n_inputs = 0
+
           # avoids using mutable objects as default arguments, which causes a memory leak
           if not nodes:
                self.nodes = {}
+          else:
+               self.nodes = nodes
           if not dydt:
                self._dydt = []
+          else:
+               self._dydt = dydt
           if not y0:
                self.y0 = []
+          else:
+               self.y0 = y0
 
+          self.inputs = None
           self.input_funcs = None 
           self.integrator = None
           self.trip_conditions = None
@@ -28,6 +35,39 @@ class System:
      @property
      def dydt(self):
           return [node.dydt for node in self.nodes.values()]
+     
+     def _get_full_input(self,times):
+          return [f(times) for f in self.input_funcs]
+     
+     def _check_trip(self,state,diff,bounds,trip_types):
+          '''
+          Returns true if the state variables referenced by the indicies fall outside
+          of the bounds 
+          '''
+          # print(state)
+          # print(diff)
+          # print(bounds)
+          # print(trip_types)
+          for idx in range(len(state)):
+               bounds_s = bounds[idx]
+               min_s = bounds_s[0]
+               max_s = bounds_s[1]
+               if trip_types[idx] == 'state':
+                    s = state[idx]
+               elif trip_types[idx] == 'diff':
+                    try:
+                         s = diff[idx]
+                    except:
+                         return None
+               else:
+                    raise ValueError('''Invalid trip type. Currently supported 
+                                        are 'state' and 'diff'.''')
+               # print(s)
+               if (s < min_s):
+                    return (idx, min_s)
+               elif (s > max_s):
+                    return (idx, max_s)
+          return None
      
      @dydt.setter
      def dydt(self, dydt):
@@ -48,26 +88,37 @@ class System:
           self.n_inputs += 1
           return input_obj
      
-     def add_trip_conditions(self, indicies, bounds):
+     def set_trip_conditions(self, indices, bounds, trip_types = None):
+          '''
+          set bounds for state variables given by index in indicies.
+          when bound is reached, integration stops
+          '''
           self.trip_conditions = {}
-          self.trip_conditions['indicies'] = indicies
+          self.trip_conditions['indicies'] = indices
           self.trip_conditions['bounds'] = bounds 
-     
-     def _get_full_input(self,times):
-          return [f(times) for f in self.input_funcs]
+          if trip_types:
+               self.trip_conditions['trip_types'] = trip_types
+          else:
+               self.trip_conditions['trip_types'] = ['state']*len(indices)
      
      def set_custom_past(self, past: CubicHermiteSpline, t_truncate = None):
+          '''
+          takes a set of anchors (past) as the past for the current integrator.
+          past can be truncated to t_truncate 
+          '''
           if (t_truncate):
                past.truncate(t_truncate)
           self.custom_past = past
 
-     
      def finalize(self, T, 
                   sdd: bool = False, 
                   md: float = 1e10):
           '''
           instantializes and stores JiTCDDE integrator. Can be used for direct 
           accesss to JiTCDDE integrator object 
+          T (np.ndarray): time array
+          sdd (bool): state-dependent delays
+          md (bool): maximum delay
           '''
           if (self.integrator): 
                self.integrator = None
@@ -75,11 +126,12 @@ class System:
           self.dydt = [n.dydt for n in self.nodes.values()]
           if (self.input_funcs):
                # set up input spline
+               print('setting up input splines...')
                spline = CubicHermiteSpline(n = self.n_inputs) 
                spline.from_function(self._get_full_input, times_of_interest = T)
                self.input = spline
                # instantiate integrator
-               DDE = jitcdde_input(self.dydt,self.input)
+               DDE = jitcdde_input(self.dydt,self.input,max_delay = md)
                # set initial conditions
                if not (self.custom_past):
                     self.y0 = [n.y0 for n in self.nodes.values()]
@@ -91,6 +143,7 @@ class System:
                     for a in self.custom_past:
                          a.time -= t_last
                     DDE.add_past_points(self.custom_past)
+               DDE.adjust_diff()
 
           else:
                DDE = jitcdde(self.dydt, max_delay = md)
@@ -134,21 +187,6 @@ class System:
           val = self.integrator.get_state()[j][1][i]
           deriv = self.integrator.get_state()[j][2][i]
           return (val,deriv)
-     
-     def _check_trip(self,state,bounds):
-          '''
-          Returns true if the state variables referenced by the indicies fall outside
-          of the bounds 
-          '''
-          for idx, s in enumerate(state):
-               bounds_s = bounds[idx]
-               min_s = bounds_s[0]
-               max_s = bounds_s[1]
-               if (s < min_s):
-                    return (idx, min_s)
-               elif (s > max_s):
-                    return (idx, max_s)
-          return None
                
      def solve(self, 
                T: list, 
@@ -176,13 +214,20 @@ class System:
           if self.trip_conditions:
           # integrate with trip conditions
                for t_x in T:
-                    y.append(self.integrator.integrate(t_x))
-                    states = [y[-1][i] for i in self.trip_conditions['indicies']]
-                    tripped = self._check_trip(states,self.trip_conditions['bounds'])
+                    y.append(np.array(self.integrator.integrate(t_x)))
+                    states = y[-1][self.trip_conditions['indicies']]
+                    try:
+                         derivs = (y[-1]-y[-2])/t_x
+                    except:
+                         derivs = []
+                    tripped = self._check_trip(states,
+                                               derivs,
+                                               self.trip_conditions['bounds'],
+                                               self.trip_conditions['trip_types'])
                     if tripped:
                          self.trip_conditions['tripped_idx'] = self.trip_conditions['indicies'][tripped[0]]
                          self.trip_conditions['tripped_val'] = tripped[1]
-                         print(f"tripped: ({tripped[0]},{tripped[1]})")
+                         print(f"tripped at t = {t_x}: ({tripped[0]},{tripped[1]})")
                          # calculate trip time
                          window = 1
                          trip_sol = []

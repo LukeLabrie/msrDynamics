@@ -24,7 +24,7 @@ python -m pip install -e .
 
 ## Methodology 
 
-The API creates nodal systems, of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
+The API is designed for building nodal systems of the form discussed in the examples below, whereby variables representing system properties or masses are aggregated into nodes with associated properties, and which only interact with other nodes through these properties. The system can then be described as a first-order system of differential equations, suitable for a numerical solver. The nodes therefore, are essentially representations of the state variables of the system. 
 
 For more detail on this approach and its applications, see:
 - [Ball, 1963](https://digital.library.unt.edu/ark:/67531/metadc1201699/) 
