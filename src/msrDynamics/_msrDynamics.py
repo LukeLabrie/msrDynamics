@@ -29,32 +29,35 @@ class System:
           self.inputs = None
           self.input_funcs = None 
           self.integrator = None
-          self.trip_conditions = None
           self.custom_past = None
-
+          self.trip_conditions = None
+          self.trip_info = None
      @property
      def dydt(self):
           return [node.dydt for node in self.nodes.values()]
      
+     @dydt.setter
+     def dydt(self, dydt):
+          self._dydt = dydt
+
      def _get_full_input(self,times):
           return [f(times) for f in self.input_funcs]
      
-     def _check_trip(self,state,diff,bounds,trip_types):
+     def _check_trip(self,time,state,diff):
           '''
           Returns true if the state variables referenced by the indicies fall outside
           of the bounds 
           '''
-          # print(state)
-          # print(diff)
-          # print(bounds)
-          # print(trip_types)
-          for idx in range(len(state)):
-               bounds_s = bounds[idx]
+          for idx, trip_obj in enumerate(self.trip_conditions):
+               if trip_obj.check_after:
+                    if time < trip_obj.check_after:
+                         return None
+               bounds_s = trip_obj.bounds
                min_s = bounds_s[0]
                max_s = bounds_s[1]
-               if trip_types[idx] == 'state':
+               if trip_obj.trip_type == 'state':
                     s = state[idx]
-               elif trip_types[idx] == 'diff':
+               elif trip_obj.trip_type == 'diff':
                     try:
                          s = diff[idx]
                     except:
@@ -69,9 +72,6 @@ class System:
                     return (idx, max_s)
           return None
      
-     @dydt.setter
-     def dydt(self, dydt):
-          self._dydt = dydt
      
      def add_input(self, input_func, T):
           '''
@@ -87,19 +87,6 @@ class System:
           input_obj = input(self.n_inputs)
           self.n_inputs += 1
           return input_obj
-     
-     def set_trip_conditions(self, indices, bounds, trip_types = None):
-          '''
-          set bounds for state variables given by index in indicies.
-          when bound is reached, integration stops
-          '''
-          self.trip_conditions = {}
-          self.trip_conditions['indicies'] = indices
-          self.trip_conditions['bounds'] = bounds 
-          if trip_types:
-               self.trip_conditions['trip_types'] = trip_types
-          else:
-               self.trip_conditions['trip_types'] = ['state']*len(indices)
      
      def set_custom_past(self, past: CubicHermiteSpline, t_truncate = None):
           '''
@@ -198,6 +185,9 @@ class System:
           sdd: State-dependent delays
           max_delay: max delay
           '''
+          if self.nodes is None:
+               raise ValueError('No nodes have been added to the system')
+          
           # clear data
           for n in self.nodes.values():
                if (n.y_out.any()):
@@ -214,31 +204,49 @@ class System:
           if self.trip_conditions:
           # integrate with trip conditions
                for t_x in T:
+
+                    # extract state and derivs for trip check 
                     y.append(np.array(self.integrator.integrate(t_x)))
-                    states = y[-1][self.trip_conditions['indicies']]
-                    try:
-                         derivs = (y[-1]-y[-2])/t_x
-                    except:
+                    idxs = [c.idx for c in self.trip_conditions]
+                    states = y[-1][idxs]
+
+                    # derivative is only estimated after the first step 
+                    if len(y) > 1:
+                         derivs = ((y[-1]-y[-2])/(T[1]-T[0]))[idxs]
+                    else:
                          derivs = []
-                    tripped = self._check_trip(states,
-                                               derivs,
-                                               self.trip_conditions['bounds'],
-                                               self.trip_conditions['trip_types'])
+
+                    # check if system has tripped
+                    tripped = self._check_trip(t_x,states,derivs)
                     if tripped:
-                         self.trip_conditions['tripped_idx'] = self.trip_conditions['indicies'][tripped[0]]
-                         self.trip_conditions['tripped_val'] = tripped[1]
-                         print(f"tripped at t = {t_x}: ({tripped[0]},{tripped[1]})")
-                         # calculate trip time
-                         window = 1
+                         # get trip conidition and system state 
+                         trip_obj = self.trip_conditions[tripped[0]]
+                         state = self.integrator.get_state()
+
+                         # store trip info 
+                         self.trip_info = {}
+                         self.trip_info['idx'] = trip_obj.idx
+                         self.trip_info['limit'] = tripped[1]
+                         self.trip_info['type'] = trip_obj.trip_type
+                         print(self.trip_info)
+                         
+                         # calculate exact trip time using splines 
                          trip_sol = []
-                         while not trip_sol:
-                              sol_temp = solve_from_anchors((self.integrator.get_state()[-1-window],
-                                                            self.integrator.get_state()[-1]),
-                                                            self.trip_conditions['tripped_idx'],
-                                                            self.trip_conditions['tripped_val'])
-                              trip_sol = sol_temp
-                              window += 1
-                         self.trip_conditions['t_trip'] = trip_sol[0][0]
+                         start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
+                         print()
+                         print('start args:')
+                         print(self.trip_info['idx'])
+                         print(self.trip_info['limit'])
+                         print(start)
+                         print(self.trip_info['type'])
+                         print('end args.')
+                         print()
+                         trip_sol = state.solve(self.trip_info['idx'],
+                                                  self.trip_info['limit'],
+                                                  beginning = start,
+                                                  target = self.trip_info['type'])
+                         self.trip_info['time'] = trip_sol[0][0]
+                         print(f"tripped at t = {self.trip_info['time']:.2f}: ({tripped[0]},{tripped[1]})")
                          break
           else:
                for t_x in T:
@@ -301,6 +309,7 @@ class Node:
           self.index = None           # JiTCDDE state variable index, to be assigned by System
           self.y_out = np.array([])   # solution data, to be populated by System
           self.y_rhs = np.array([])   # solution data, to be populated by System
+          self.trip_conditions = None
     
      @property
      def dydt(self):
