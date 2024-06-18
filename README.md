@@ -1,5 +1,7 @@
 # msrDynamics
 
+[![Documentation Status](https://readthedocs.org/projects/msrdynamics/badge/?version=latest)](https://msrdynamics.readthedocs.io/en/latest/?badge=latest)
+
 `msrDynamics` is an object-oriented API to [JiTCDDE](https://github.com/neurophysik/jitcdde), 
 a delay differential equation solver, written with emulation of simulink-style solvers for
 molten salt reactor (MSR) systems in mind (see [Singh et al](https://www.sciencedirect.com/science/article/pii/S030645491730381X)),
