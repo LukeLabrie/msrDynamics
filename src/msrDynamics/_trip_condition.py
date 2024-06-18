@@ -10,7 +10,8 @@ class TripCondition:
                  trip_type = None, 
                  bounds = (-float('inf'),float('inf')),
                  idx = None,
-                 check_after = None
+                 check_after = None,
+                 delay = None
                  ) -> None:
         
         # set trip type 
@@ -23,6 +24,7 @@ class TripCondition:
         self.bounds = bounds
         self.idx = idx
         self.check_after = check_after
+        self.delay = delay
 
     def _check_type(self,trip_type):
         if trip_type not in TRIP_TYPES:
