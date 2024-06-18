@@ -88,6 +88,11 @@ x.dydt = x.y() - y.y()
 y.dydt = - x.y() + y.y() 
 ```
 
+Helper methods currently encompass the following effects:
+- Point kinetics, including modified point kinetics for MSRs
+- Convective heat transfer
+- Advective heat transfer (mass flow)
+
 ## Simple Example
 
 The diagram below describes a simple MSR system. The notebook for the example below can be found in 
