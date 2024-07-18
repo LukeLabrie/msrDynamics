@@ -71,6 +71,7 @@ Module Reference
 ================
 
 .. automodule:: msrDynamics
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
