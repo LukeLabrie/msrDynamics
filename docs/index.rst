@@ -40,7 +40,7 @@ method proposed by Shampine and Thompson [ST01]_.
 Modeling Approach
 =================
 
-The model, as intended, essentially describes heat flow through the component masses, aggregating all spatial 
+The model essentially describes heat flow through the component masses, aggregating all spatial 
 considerations into one-dimensional relationships governed by constant coefficients. Listed below is some relevant 
 literature on this approach and its applications:
 
@@ -58,7 +58,12 @@ Usage & API Description
 The ``Node()`` object includes helper functions to define symbolic expressions representing convective and advective heat 
 transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well.  
 
-Module Reference
+.. image:: _static/sample_core.png
+   :alt: Sample Core
+   :width: 600px
+
+
+API Reference
 ================
 
 .. automodule:: msrDynamics
