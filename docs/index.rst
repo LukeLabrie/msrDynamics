@@ -6,7 +6,7 @@
 msrDynamics
 =========================================
 
-**Documentation Under Construction**
+*Documentation Under Construction*
 
 ``msrDynamics`` is an object-oriented API for constructing and solving reduced order thermal hydraulic systems, written 
 with emulation of Simulink-style solvers for molten salt reactor (MSR) systems in mind 
@@ -39,17 +39,16 @@ be solved is therefore a delay differential equation of the form
 
 ``msrDynamics`` essentially provides tools to construct symbolic expressions representing a system of this form, which 
 are then passed to `JiTCDDE <https://github.com/neurophysik/jitcdde>`_ as the backend solver. ``JiTCDDE`` integrates 
-adaptively using a Bogacki-Shampine pair 
+adaptively using a Bogacki-Shampine pair. The state and derivative of the system or stored at each integration step, 
+which allows for past states to be evaluated using piece-wise cubic hermite inteprolation. This is the DDE integration 
+method proposed by Shampine and Thompson [ST01]_.
 
 Modeling Approach
 =================
 
-Nodes representing aggregated system masses are defined by a mass, 
-specific heat capacity, 
-
-System components are represented as grou
-
-Listed below is some relevant literature on this approach and its applications:
+The model, as intended, essentially describes heat flow through the component masses, aggregating all spatial 
+considerations into one-dimensional relationships governed by constant coefficients. Listed below is some relevant 
+literature on this approach and its applications:
 
 * `Ball, 1963 <https://digital.library.unt.edu/ark:/67531/metadc1201699/>`_
 * `Ball and Kerlin, 1965 <https://www.osti.gov/biblio/4591881>`_
@@ -58,6 +57,15 @@ Listed below is some relevant literature on this approach and its applications:
 * `Singh et al., 2018a <https://doi.org/10.1080/00295450.2017.1416879>`_
 * `Singh et al., 2018b <https://doi.org/10.1016/j.anucene.2017.10.047>`_
 * `Singh et al., 2020 <https://doi.org/10.1016/j.nucengdes.2019.110457>`_
+
+
+
+Usage & API Description
+=======================
+
+The `Node()` object includes helper functions to define symbolic expressions representing convective and advective heat 
+transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well.  
+
 
 
 
@@ -77,3 +85,5 @@ References
 ==========
 
 .. [ST01] L.F. Shampine, S. Thompson: Solving DDEs in Matlab, Applied Numerical Mathematics 37, pp. 441–458 (2001), `10.1016/S0168-9274(00)00055-6 <http://dx.doi.org/10.1016/S0168-9274(00)00055-6>`_.
+
+.. _JiTCDDE documentation: http://jitcdde.readthedocs.io

@@ -2,6 +2,7 @@ from jitcdde import jitcdde, y, t, jitcdde_input, input
 import numpy as np
 import chspy
 import sympy as sp
+import matplotlib.pyplot as plt
 
 class System:
      '''
@@ -56,6 +57,8 @@ class System:
                bounds_s = trip_obj.bounds
                min_s = bounds_s[0]
                max_s = bounds_s[1]
+
+               # if delayed, interpolate past to check trip condition
                if trip_obj.delay:
                     if (len(self.trip_info['state']) > 1) and (time >= trip_obj.delay):
                          chs = self.trip_info['state']
@@ -63,10 +66,8 @@ class System:
                          a1 = chs[idx_interp]
                          a2 = chs[idx_interp+1]
                          if trip_obj.trip_type == 'state':
-                              # return None
                               s = chspy.interpolate(time - trip_obj.delay, idx, (a1,a2))
                          elif trip_obj.trip_type == 'diff':
-                              # return None
                               s = chspy.interpolate_diff(time - trip_obj.delay, idx, (a1,a2))
                          else:
                               raise ValueError('''Invalid trip type. Currently supported 
@@ -194,8 +195,8 @@ class System:
           deriv = self.integrator.get_state()[j][2][i]
           return (val,deriv)
                
-     def solve(self, 
-               T: list, 
+     def solve(self, t0, tf,
+               incr: float = 0.01, 
                sdd: bool = False, 
                max_delay: float = 1e10,
                max_anchors: int = 100,
@@ -209,14 +210,15 @@ class System:
           sdd: State-dependent delays
           max_delay: max delay
           '''
-          if self.nodes is None:
+          if len(self.nodes) == 0:
                raise ValueError('No nodes have been added to the system')
           
           # clear data
           for n in self.nodes.values():
                if (n.y_out.any()):
                     n.y_out = []
-
+          
+          T = np.arange(t0, tf, incr)
           # set integrator 
           print("finalizing integrator...")
           self.finalize(T, sdd, max_delay, max_anchors, input_tol)
@@ -244,26 +246,30 @@ class System:
                          derivs = [0.0]*len(states)
                     
                     if 'state' in self.trip_info:
-                         self.trip_info['state']
                          self.trip_info['state'].extend([chspy.Anchor(t_x, states, derivs)])
                     else:
                          self.trip_info['state'] = chspy.CubicHermiteSpline(n = len(self.trip_conditions), 
                                                                anchors = [chspy.Anchor(t_x, states, derivs)])
+
                     # check if system has tripped
                     tripped = self._check_trip(t_x,states,derivs)
                     if tripped:
-                         print(f'tripped after integration to t = {t_x:3f}')
-                         print('computing trip time within interval...')
-                         # get trip conidition and system state 
+                         # get trip conidition object
                          trip_obj = self.trip_conditions[tripped[0]]
-                         state = self.integrator.get_state()
+                         print(y[-1][46])
+                         print(f'idx {tripped[0]} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
 
                          # store trip info 
                          self.trip_info['idx'] = trip_obj.idx
                          self.trip_info['limit'] = tripped[1]
                          self.trip_info['type'] = trip_obj.trip_type
-                         
+
+                         # get system spline
+                         print('getting state...')
+                         state = self.integrator.get_state()
+
                          # calculate exact trip time using splines 
+                         print('computing trip time within interval...')
                          trip_sol = []
                          start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
                          trip_sol = state.solve(self.trip_info['idx'],
@@ -288,6 +294,22 @@ class System:
                     s[1].y_out = np.array([state[s[0]] for state in y])
 
           return np.array(y)
+     
+     def plot_input(self, index):
+          '''
+          Returns matplotlib ax() object with plot of selected input
+          '''
+          if self.input is None:
+               raise ValueError('No input has been defined')
+          else:
+               _, ax = plt.subplots()
+               times = []
+               vals = []
+               for i in self.input:
+                    times.append(i.time)
+                    vals.append(i.state[index])
+               ax.plot(times,vals)
+               return ax
 
 class Node:
      """
@@ -403,6 +425,11 @@ class Node:
           if self.dndt or self.dcdt or self.drdt:
                raise ValueError('''This node has already been assigned 
                                 point-kinetic dynamics''')
+          if (self.m <= 0.0) or (self.scp <= 0.0):
+               print(f'node mass: {self.m:.2f}')
+               print(f'node specific heat capacity: {self.scp:.2f}')
+               raise ValueError('''Invalid specific heat capacity or mass for node. To set convective heat transfer 
+                                   dynamics, both mass and specific heat capacity need to be greater than zero.''')
           
           #check that node has been added to the system
           if self.y:
