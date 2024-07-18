@@ -76,12 +76,14 @@ Module Reference
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: msrDynamics.Node
+.. autoclass:: Node
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
-.. autoclass:: msrDynamics.System
+.. autoclass:: System
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
