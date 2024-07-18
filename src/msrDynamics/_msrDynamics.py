@@ -305,7 +305,6 @@ class System:
                 if tripped:
                     # get trip condition object
                     trip_obj = self.trip_conditions[tripped[0]]
-                    print(y[-1][46])
                     print(f'idx {tripped[0]} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
 
                     # store trip info 
