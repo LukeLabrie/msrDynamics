@@ -256,7 +256,6 @@ class System:
                     if tripped:
                          # get trip conidition object
                          trip_obj = self.trip_conditions[tripped[0]]
-                         print(y[-1][46])
                          print(f'idx {tripped[0]} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
 
                          # store trip info 
@@ -330,13 +329,18 @@ class Node:
           y_out (list): Solution data, to be populated by the System class.
 
      Methods:
-          set_dTdt_advective(source): Sets the rate of temperature change due to advection.
-          set_dTdt_internal(source, k): Sets the rate of temperature change due to internal heat generation.
-          set_dTdt_convective(source, hA): Sets the rate of temperature change due to convective heat transfer.
-          set_dndt(r, beta_eff, Lambda, lam, C): Sets the rate of change of neutron population using the point kinetics equation.
-          set_dcdt(n, beta, Lambda, lam, t_c, t_l): Sets the rate of change of precursor concentration.
-          set_drdt(sources, coeffs): Sets the rate of change of reactivity based on feedback.
-          dydt(): Calculates and returns the total rate of change of state variables.
+          set_dTdt_advective(source): 
+               Sets the rate of temperature change due to advection.
+          set_dTdt_internal(source, k): 
+               Sets the rate of temperature change due to internal heat generation.
+          set_dTdt_convective(source, hA): 
+               Sets the rate of temperature change due to convective heat transfer.
+          set_dndt(r, beta_eff, Lambda, lam, C): 
+               Sets the rate of change of neutron population using the point kinetics equation.
+          set_dcdt(n, beta, Lambda, lam, t_c, t_l): 
+               Sets the rate of change of precursor concentration.
+          set_drdt(sources, coeffs): 
+               Sets the rate of change of reactivity based on feedback.
 
      The class is designed to model the thermal-hydraulic and neutron-kinetic behavior of a node within a nuclear reactor system.
      """
@@ -346,6 +350,16 @@ class Node:
                     scp: float = 0.0,
                     W: float = 0.0,
                     y0: float = 0.0) -> None:
+          """
+          Initializes the node 
+
+          Parameters:
+               name (str): name
+               m (float): mass
+               scp (float): specific heat capacity 
+               W (float): flow rate in (mass/time)
+               y0 (float): initial value
+          """
           self.name = name            # node name
           self.m = m                  # mass (kg)
           self.scp = scp              # specific heat capacity (J/(kg*°K))
