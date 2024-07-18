@@ -72,7 +72,10 @@ Module Reference
 
 .. automodule:: _msrDynamics
 
-.. automodule:: _trip_condition
+.. autoclass:: Node
+
+.. autoclass:: System
+
 
 
 =================
