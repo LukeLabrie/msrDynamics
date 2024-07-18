@@ -70,11 +70,20 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
 Module Reference
 ================
 
-.. automodule:: _msrDynamics
+.. automodule:: msrDynamics
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. autoclass:: Node
+.. autoclass:: msrDynamics.Node
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
-.. autoclass:: System
+.. autoclass:: msrDynamics.System
+   :members:
+   :undoc-members:
+   :show-inheritance:
 
 
 
