@@ -63,14 +63,16 @@ literature on this approach and its applications:
 Usage & API Description
 =======================
 
-The `Node()` object includes helper functions to define symbolic expressions representing convective and advective heat 
+The ``Node()`` object includes helper functions to define symbolic expressions representing convective and advective heat 
 transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well.  
 
 
+Module Reference
+================
 
+.. automodule:: _msrDynamics
 
-
-
+.. automodule:: _trip_condition
 
 
 =================
