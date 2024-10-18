@@ -52,16 +52,15 @@ literature on this approach and its applications:
 * `Singh et al., 2018b <https://doi.org/10.1016/j.anucene.2017.10.047>`_
 * `Singh et al., 2020 <https://doi.org/10.1016/j.nucengdes.2019.110457>`_
 
+.. image:: _static/sample_core.png
+   :alt: Sample Core
+   :width: 600px
+
 Usage & API Description
 =======================
 
 The ``Node()`` object includes helper functions to define symbolic expressions representing convective and advective heat 
 transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well.  
-
-.. image:: _static/sample_core.png
-   :alt: Sample Core
-   :width: 600px
-
 
 API Reference
 ================

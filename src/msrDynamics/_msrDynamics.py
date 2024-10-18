@@ -53,7 +53,13 @@ class System:
         self.integrator = None
         self.custom_past = None
         self.trip_conditions = None
-        self.trip_info = None
+        self.trip_info = {
+            'time': float('inf'),
+            'tripped': False
+            }
+        self.input = None
+        self.pid_controllers = None
+        self.input_func_names = None
 
     @property
     def dydt(self):
@@ -117,7 +123,7 @@ class System:
                     return (idx, max_s)
         return None
 
-    def add_input(self, input_func):
+    def add_input(self, input_func, times, max_anchors = 100, input_tol = 5, name: str = None):
         """
         Add an input function of time to the integrator.
 
@@ -127,15 +133,29 @@ class System:
         Returns:
             input: JiTCDDE input object.
         """
-        # store input function for when spline is created 
+        # store input functions
         if self.input_funcs:
             self.input_funcs.append(input_func)
+            self.input_func_names.append(name)
         else:
             self.input_funcs = [input_func]
+            self.input_func_names = [name]
+
+        # set up input spline
+        spline = chspy.CubicHermiteSpline(n=1)
+        spline.from_function(input_func, 
+                                times_of_interest=times, 
+                                max_anchors=max_anchors, 
+                                tol=input_tol)
+        if self.input:
+            self.input = chspy.join(self.input,spline)
+        else:
+            self.input = spline
 
         # return jitcdde input object so it can be used for sympy expressions
         input_obj = input(self.n_inputs)
         self.n_inputs += 1
+
         return input_obj
 
     def set_custom_past(self, past: chspy.CubicHermiteSpline, t_truncate=None):
@@ -150,7 +170,7 @@ class System:
             past.truncate(t_truncate)
         self.custom_past = past
 
-    def finalize(self, T, sdd=False, md=1e10, max_anchors=100, input_tol=5):
+    def finalize(self, T, sdd=False, md=1e10):
         """
         Instantiate and store JiTCDDE integrator.
 
@@ -165,17 +185,16 @@ class System:
             self.integrator = None
         # set up system matrix
         self.dydt = [n.dydt for n in self.nodes.values()]
-        if self.input_funcs:
-            # set up input spline
-            print('setting up input splines...')
-            spline = chspy.CubicHermiteSpline(n=self.n_inputs) 
-            spline.from_function(self._get_full_input, 
-                                 times_of_interest=T, 
-                                 max_anchors=max_anchors, 
-                                 tol=input_tol)
-            self.input = spline
+        if self.input:
             # instantiate integrator
-            DDE = jitcdde_input(self.dydt, self.input, max_delay=md)
+            if self.pid_controllers:
+                DDE = jitcdde_input(self.dydt, 
+                                    self.input, 
+                                    max_delay=md, 
+                                    callback_functions=[ (pc.sym_func, pc.func, pc.n_args) for pc in self.pid_controllers])
+            else:
+                DDE = jitcdde_input(self.dydt, self.input, max_delay=md)
+
             # set initial conditions
             if not self.custom_past:
                 self.y0 = [n.y0 for n in self.nodes.values()]
@@ -190,7 +209,10 @@ class System:
             DDE.adjust_diff()
 
         else:
-            DDE = jitcdde(self.dydt, max_delay=md)
+            if self.pid_controllers:
+                DDE = jitcdde(self.dydt, max_delay=md, callback_functions=[ (pc.sym_func, pc.func, pc.n_args) for pc in self.pid_controllers])
+            else:
+                DDE = jitcdde(self.dydt, max_delay=md)
             # set initial conditions
             if not self.custom_past:
                 self.y0 = [n.y0 for n in self.nodes.values()]
@@ -220,6 +242,7 @@ class System:
             n.index = index
             # add node to nodes dictionary by name, if available, and by index if not
             if n.name:
+                assert n.name not in self.nodes, f"Nodes cannot share the same name. {n.name} is a duplicate."
                 self.nodes[n.name] = n
             else:
                 self.nodes[index] = n
@@ -241,7 +264,15 @@ class System:
         deriv = self.integrator.get_state()[j][2][i]
         return (val, deriv)
 
-    def solve(self, t0, tf, incr=0.01, sdd=False, max_delay=1e10, max_anchors=100, input_tol=5, populate_nodes=False, abs_tol=1e-10, rel_tol=1e-05):
+    def solve(self, 
+              T, 
+              sdd=False, 
+              max_delay=1e10, 
+              populate_nodes=False, 
+              abs_tol=1e-10, 
+              rel_tol=1e-05, 
+              min_step = 1e-10, 
+              max_step = 10.0):
         """
         Solve the system and return the solution matrix.
 
@@ -267,19 +298,17 @@ class System:
         for n in self.nodes.values():
             if (n.y_out.any()):
                 n.y_out = []
-        
-        T = np.arange(t0, tf, incr)
+
         # set integrator 
         print("finalizing integrator...")
-        self.finalize(T, sdd, max_delay, max_anchors, input_tol)
-        self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol)
+        self.finalize(T, sdd, max_delay)
+        self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
 
         # solution 
         y = []
 
         print("integrating...")
         if self.trip_conditions:
-            self.trip_info = {}
 
             # integrate with trip conditions
             for t_x in T:
@@ -308,6 +337,7 @@ class System:
                     print(f'idx {tripped[0]} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
 
                     # store trip info 
+                    self.trip_info['tripped'] = True
                     self.trip_info['idx'] = trip_obj.idx
                     self.trip_info['limit'] = tripped[1]
                     self.trip_info['type'] = trip_obj.trip_type
@@ -320,10 +350,11 @@ class System:
                     print('computing trip time within interval...')
                     trip_sol = []
                     start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
+                    solve_diff = True if self.trip_info['type'] == 'diff' else False
                     trip_sol = state.solve(self.trip_info['idx'],
                                             self.trip_info['limit'],
                                             beginning=start,
-                                            target=self.trip_info['type'])
+                                            solve_derivative = solve_diff)
                     if trip_obj.delay:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
@@ -338,6 +369,7 @@ class System:
 
         # populate node objects with solutions 
         if populate_nodes:
+            print('populating nodes objects solution vectors...')
             for s in enumerate(self.nodes.values()):
                 s[1].y_out = np.array([state[s[0]] for state in y])
 
@@ -410,6 +442,7 @@ class Node:
         self.dndt = 0.0             # sym. expression for dn/dt (n = neutron population)
         self.dcdt = 0.0             # sym. expression for dc/dt (c = precursor concentration)
         self.drdt = 0.0             # sym. expression for dr/dt (r = reactivity)
+        self.dndt_decay = 0.0       # syms expression for dn_d/dt (n_d = fractional decay generation)
         self._dydt = 0.0            # sym. expression for user-defined dynamics 
         self.y = None               # JiTCDDE state variable object, to be assigned by System
         self.index = None           # JiTCDDE state variable index, to be assigned by System
@@ -422,7 +455,7 @@ class Node:
         """float: Symbolic expression for the rate of change of state variables."""
         return self.dTdt_advective + self.dTdt_internal + \
                self.dTdt_convective + self.dndt + self.dcdt + self.drdt + \
-               self._dydt
+               self._dydt + self.dndt_decay
 
     @dydt.setter
     def dydt(self, custom_dydt):
@@ -449,7 +482,7 @@ class Node:
             raise ValueError('''Nodes need to be added to a System() object 
                              before setting dynamics.''')
 
-    def set_dTdt_internal(self, source: callable, k: float):
+    def set_dTdt_internal(self, source: list, k: list):
         """
         Set the rate of temperature change due to internal heat generation.
 
@@ -466,7 +499,8 @@ class Node:
         if self.y:
             # reset in case of update
             self.dTdt_internal = 0.0
-            self.dTdt_internal = k * source / (self.m * self.scp)
+            for idx, s in enumerate(source):
+                self.dTdt_internal += k[idx] * s / (self.m * self.scp)
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
@@ -595,5 +629,14 @@ class Node:
             for s in enumerate(sources):
                 fb += s[1] * coeffs[s[0]]
             self.drdt = fb
+        else:
+            raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        
+    def set_dndt_decay(self, n: y, n0: float, rel_yield: float, lam: float):
+        #check that node has been added to the system
+        if self.y:
+            # reset in case of update
+            self.dndt_decay = 0.0
+            self.dndt_decay += ((n/n0) * rel_yield - lam * self.y())  
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
