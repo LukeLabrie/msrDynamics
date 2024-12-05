@@ -53,7 +53,10 @@ napoleon_google_docstring = True
 napoleon_numpy_docstring = True
 
 # Intersphinx mapping
-intersphinx_mapping = {'https://docs.python.org/3/': None}
+intersphinx_mapping = {
+    'python': ('https://docs.python.org/3/', None),
+}
+
 
 # Todo extension settings
 todo_include_todos = True

@@ -3,6 +3,7 @@ import numpy as np
 import chspy
 import sympy as sp
 import matplotlib.pyplot as plt
+from tqdm import tqdm
 
 class System:
     """
@@ -58,8 +59,10 @@ class System:
             'tripped': False
             }
         self.input = None
-        self.pid_controllers = None
+        self.pid_loops = []
         self.input_func_names = None
+        self.max_delay = 1e10
+        self.callback_functions = []
 
     @property
     def dydt(self):
@@ -170,7 +173,7 @@ class System:
             past.truncate(t_truncate)
         self.custom_past = past
 
-    def finalize(self, T, sdd=False, md=1e10):
+    def finalize(self, max_delay):
         """
         Instantiate and store JiTCDDE integrator.
 
@@ -181,52 +184,32 @@ class System:
             max_anchors (int): Maximum number of anchors.
             input_tol (int): Tolerance for input spline.
         """
-        if self.integrator: 
-            self.integrator = None
         # set up system matrix
         self.dydt = [n.dydt for n in self.nodes.values()]
+
+        # input uses different integrator object
         if self.input:
-            # instantiate integrator
-            if self.pid_controllers:
-                DDE = jitcdde_input(self.dydt, 
-                                    self.input, 
-                                    max_delay=md, 
-                                    callback_functions=[ (pc.sym_func, pc.func, pc.n_args) for pc in self.pid_controllers])
-            else:
-                DDE = jitcdde_input(self.dydt, self.input, max_delay=md)
-
-            # set initial conditions
-            if not self.custom_past:
-                self.y0 = [n.y0 for n in self.nodes.values()]
-                DDE.constant_past(self.y0)
-            else:
-                DDE.purge_past()
-                # shift past time to end at t = 0
-                t_last = self.custom_past[-1].time
-                for a in self.custom_past:
-                    a.time -= t_last
-                DDE.add_past_points(self.custom_past)
-            DDE.adjust_diff()
-
+            DDE = jitcdde_input(self.dydt, self.input, max_delay = max_delay)
         else:
-            if self.pid_controllers:
-                DDE = jitcdde(self.dydt, max_delay=md, callback_functions=[ (pc.sym_func, pc.func, pc.n_args) for pc in self.pid_controllers])
-            else:
-                DDE = jitcdde(self.dydt, max_delay=md)
-            # set initial conditions
-            if not self.custom_past:
-                self.y0 = [n.y0 for n in self.nodes.values()]
-                DDE.constant_past(self.y0)
-            else:
-                # shift past time to end at t = 0
-                t_last = self.custom_past[-1].time
-                for a in self.custom_past:
-                    a.time -= t_last
-                DDE.add_past_points(self.custom_past)
+            DDE = jitcdde(self.dydt, max_delay = max_delay)
 
-        # max delay needs to be provided in the case of state-dependent delays
-        if sdd:
-            DDE.max_delay = md
+        # populate callback functions 
+        if self.pid_loops:
+            self.callback_functions.extend([ (pc.output_sym, pc.output_func, pc.n_args) for pc in self.pid_loops])
+        DDE.callback_functions = self.callback_functions
+
+        # set initial conditions
+        if not self.custom_past:
+            self.y0 = [n.y0 for n in self.nodes.values()]
+            DDE.constant_past(self.y0)
+        else:
+            # shift past time to end at t = 0
+            t_last = self.custom_past[-1].time
+            for a in self.custom_past:
+                a.time -= t_last
+            DDE.add_past_points(self.custom_past)
+
+        # DDE.adjust_diff()
         self.integrator = DDE
 
     def add_nodes(self, new_nodes: list):
@@ -263,16 +246,24 @@ class System:
         val = self.integrator.get_state()[j][1][i]
         deriv = self.integrator.get_state()[j][2][i]
         return (val, deriv)
+    
+    def get_node_by_index(self, idx):
+
+        for n in self.nodes:
+            if n.index == idx:
+                return n
+        raise ValueError(f'Node with index {idx} not found')
 
     def solve(self, 
               T, 
-              sdd=False, 
               max_delay=1e10, 
               populate_nodes=False, 
               abs_tol=1e-10, 
               rel_tol=1e-05, 
               min_step = 1e-10, 
-              max_step = 10.0):
+              max_step = 10.0,
+              md_step = 1e-2,
+              print_times = False):
         """
         Solve the system and return the solution matrix.
 
@@ -301,9 +292,9 @@ class System:
 
         # set integrator 
         print("finalizing integrator...")
-        self.finalize(T, sdd, max_delay)
+        self.max_delay = max_delay
+        self.finalize(max_delay = max_delay)
         self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
-
         # solution 
         y = []
 
@@ -313,7 +304,10 @@ class System:
             # integrate with trip conditions
             for t_x in T:
                 # extract state and derivs for trip check 
-                y.append(np.array(self.integrator.integrate(t_x)))
+                if t_x < max_delay:
+                    y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
+                else:
+                    y.append(np.array(self.integrator.integrate(t_x)))
                 idxs = [c.idx for c in self.trip_conditions]
                 states = y[-1][idxs]
 
@@ -364,8 +358,12 @@ class System:
                     print(f"limit: {tripped[1]}")
                     break
         else:
-            for t_x in T:
-                y.append(self.integrator.integrate(t_x))
+            if max_delay < T[-1]:
+                self.integrator.integrate_blindly(max_delay, md_step)
+            with tqdm(total=len(self.integrator.t + T), desc="Integration progress") as pbar:
+                for t_x in self.integrator.t + T:
+                    y.append(self.integrator.integrate(t_x))
+                    pbar.update(1)  
 
         # populate node objects with solutions 
         if populate_nodes:
@@ -640,3 +638,10 @@ class Node:
             self.dndt_decay += ((n/n0) * rel_yield - lam * self.y())  
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        
+    def add_noise(self, mu: float = 0.0, sigma: float = 1.0):
+        '''
+        Add gaussian noise of mean mu and 
+        '''
+
+        noise = Function()
