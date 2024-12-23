@@ -61,7 +61,7 @@ class System:
         self.input = None
         self.pid_loops = []
         self.input_func_names = None
-        self.max_delay = 1e10
+        self.max_delay = None
         self.callback_functions = []
 
     @property
@@ -249,7 +249,7 @@ class System:
     
     def get_node_by_index(self, idx):
 
-        for n in self.nodes:
+        for _, n in self.nodes.items():
             if n.index == idx:
                 return n
         raise ValueError(f'Node with index {idx} not found')
@@ -304,7 +304,7 @@ class System:
             # integrate with trip conditions
             for t_x in T:
                 # extract state and derivs for trip check 
-                if t_x < max_delay:
+                if (t_x < max_delay):
                     y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
                 else:
                     y.append(np.array(self.integrator.integrate(t_x)))
@@ -360,10 +360,13 @@ class System:
         else:
             if max_delay < T[-1]:
                 self.integrator.integrate_blindly(max_delay, md_step)
-            with tqdm(total=len(self.integrator.t + T), desc="Integration progress") as pbar:
-                for t_x in self.integrator.t + T:
-                    y.append(self.integrator.integrate(t_x))
-                    pbar.update(1)  
+                print(f'Integrated blindly up to t = {self.integrator.t}...')
+                with tqdm(total=len(self.integrator.t + T), desc="Integration progress") as pbar:
+                    for t_x in self.integrator.t + T:
+                        y.append(self.integrator.integrate(t_x))
+                        pbar.update(1)  
+            else:
+                y.append(self.integrator.integrate_blindly(max_delay, md_step))
 
         # populate node objects with solutions 
         if populate_nodes:
@@ -373,7 +376,7 @@ class System:
 
         return np.array(y)
 
-    def plot_input(self, index):
+    def plot_input(self, index, fac = 1.0):
         """
         Plot the input function for the given index.
 
@@ -392,7 +395,8 @@ class System:
             for i in self.input:
                 times.append(i.time)
                 vals.append(i.state[index])
-            ax.plot(times, vals)
+            times, vals = np.array(times), np.array(vals)
+            ax.plot(times/fac, vals)
             return ax
 
 

@@ -10,7 +10,7 @@ other fission and/or thermal hydraulic systems. The goal of this package is to s
 nodal models for more complex systems, where direct handling of the equations can become cumbersome. 
 
 Theory & Background
-===================
+-------------------
 
 The API is designed for building nodal systems where variables representing system components or masses are aggregated 
 into nodes with associated properties, and which only interact with other nodes through these properties. The nodes 
@@ -38,10 +38,10 @@ which allows for past states to be evaluated using piece-wise cubic hermite inte
 method proposed by Shampine and Thompson [ST01]_.
 
 Modeling Approach
-=================
+-----------------
 
 The model essentially describes heat flow through the component masses, aggregating all spatial 
-considerations into one-dimensional relationships governed by constant coefficients. Listed below is some relevant 
+considerations into zero-dimensional (spatial) relationships governed by constant coefficients. Listed below is some relevant 
 literature on this approach and its applications:
 
 * `Ball, 1963 <https://digital.library.unt.edu/ark:/67531/metadc1201699/>`_
@@ -52,18 +52,53 @@ literature on this approach and its applications:
 * `Singh et al., 2018b <https://doi.org/10.1016/j.anucene.2017.10.047>`_
 * `Singh et al., 2020 <https://doi.org/10.1016/j.nucengdes.2019.110457>`_
 
+The figure below shows an MSR core, modeled after that of the Aircraft Reactor Experiment `(ARE) <https://en.wikipedia.org/wiki/Aircraft_Reactor_Experiment>`_.
+Each node is represented by its mass and thermophysical properties. 
+
 .. image:: _static/sample_core.png
    :alt: Sample Core
    :width: 600px
 
+The ARE core consisted of NaF-ZrF4-UF4 fuel which flowed through inconel tubes making several passes through BeO moderator blocks. A liquid sodium coolant flowed 
+in the opposite direction, in direct contact with the moderator blocks and fuel tubes. The arrows in the figure above represent the heat flows considered in the model.
+For example, there is advective heat flow between Fuel 1 and Fuel 2. Both are in contact with the tubes. As such there is convective heat exchange between the fuel
+and the fuel tubes. 
+
 Usage & API Description
-=======================
+-----------------------
 
 The ``Node()`` object includes helper functions to define symbolic expressions representing convective and advective heat 
-transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well.  
+transfer, as well as generation from point-kinetics. User-defined dynamics are supported as well. The  ARE core (shown above) can be modelled as follows
+
+.. code-block:: python
+
+   from msrDynamics import Node, System 
+
+   # mass, kg
+   m_fuel_core      = 100.0
+   m_coolant_core   = 100.0
+   m_tubes_core     = 100.0
+   m_moderator_core = 350.0 
+
+   # specific heat capacity MW/°K 
+   scp_fuel      = 2.0e-3
+   scp_coolant   = 4.0e-3
+   scp_moderator = 2.0e-3 
+
+   # flow rate, kg/s
+   W_fuel    = 100.0
+   W_coolant = 50.0
+
+   # define nodes
+   fuel_1 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
+   fuel_2 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
+
+   coolant_1 = Node(m = m_coolant_core/2, scp = scp_coolant, W = W_coolant)
+   coolant_2 = Node(m = m_coolant_core/2, scp = scp_coolant, W = W_coolant)
+
 
 API Reference
-================
+-------------
 
 .. automodule:: msrDynamics
    :imported-members:
@@ -78,6 +113,18 @@ API Reference
    :show-inheritance:
 
 .. autoclass:: msrDynamics.System
+   :imported-members:
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: msrDynamics.TripCondition
+   :imported-members:
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+.. autoclass:: msrDynamics.PID_loop
    :imported-members:
    :members:
    :undoc-members:
