@@ -15,7 +15,8 @@ class PID_loop:
                  n_args: int = 2,
                  initial_value: float = None,
                  bound: tuple = None,
-                 clegg_integrator: bool = False
+                 clegg_integrator: bool = False,
+                 min_reading: float = None,
                  ) -> None:
 
         self.base_value = base_value
@@ -48,26 +49,34 @@ class PID_loop:
         self.state = []
         self.bound = bound
         self.clegg_integrator = clegg_integrator
+        self.de_prev = None
+        self.min_reading = min_reading
+        self.integral = []
         
     @property
     def output_func(self):
         if self._output_func is None:
-            if self.clegg_integrator:
-                def pid_func(y, state, t):
-                    # update control input
+            def pid_func(y, state, t):
+
+                dt = t - self.times[-1] if self.times else t
+                if (self.min_reading) and (state < self.min_reading):
+                    p_out, i_out, d_out, out, err, dedt = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
+                else:
+                    # p
                     err = state - self.setpoint_value
-                    if self.err_prev:
+                    if self.err_prev and self.clegg_integrator:
                         if np.sign(self.err_prev) != np.sign(err):
                             self.cumsum = 0.0
-                    de = err - self.err_prev if self.err_prev is not None else state - self.initial_value
-                    dt = t - self.times[-1] if self.times else t
+                    # i
+                    self.cumsum += err*dt
+                    # d
+                    de = err - self.err_prev if self.err_prev is not None else 0.0
                     if dt == 0.0:
                         out = self.output[-1] if self.output else 0.0
                         return out
                     dedt = de / dt
+
                     p_out = self.k_p*err
-                    self.cumsum += err*dt
-                    self.err_prev = err
                     i_out = self.k_i*self.cumsum
                     d_out = self.k_d*dedt
                     calc = p_out + d_out + i_out + self.base_value
@@ -76,49 +85,20 @@ class PID_loop:
                         out = max(self.bound[0], min(calc,self.bound[1]))
                     else:
                         out = calc
-                    # store inputs/outputs
-                    self.state.append(state)
-                    self.times.append(t)
-                    self.p_output.append(p_out)
-                    self.i_output.append(i_out)
-                    self.d_output.append(d_out)
-                    self.output.append(out)
-                    self.err.append(err)
-                    self.dt.append(dt)
-                    self.dedt.append(dedt)
-                    return out
-            else:
-                def pid_func(y, state, t):
-                    # update control input
-                    err = state - self.setpoint_value
-                    de = err - self.err_prev if self.err_prev is not None else state - self.initial_value
-                    dt = t - self.times[-1] if self.times else t
-                    if dt == 0.0:
-                        out = self.output[-1] if self.output else 0.0
-                        return out
-                    dedt = de / dt
-                    p_out = self.k_p*err
-                    self.cumsum += err*dt
-                    self.err_prev = err
-                    i_out = self.k_i*self.cumsum
-                    d_out = self.k_d*dedt
-                    calc = p_out + d_out + i_out + self.base_value
 
-                    if self.bound:
-                        out = max(self.bound[0], min(calc,self.bound[1]))
-                    else:
-                        out = calc
-                    # store inputs/outputs
-                    self.state.append(state)
-                    self.times.append(t)
-                    self.p_output.append(p_out)
-                    self.i_output.append(i_out)
-                    self.d_output.append(d_out)
-                    self.output.append(out)
-                    self.err.append(err)
-                    self.dt.append(dt)
-                    self.dedt.append(dedt)
-                    return out
+                # store inputs/outputs
+                self.err_prev = err
+                self.state.append(state)
+                self.times.append(t)
+                self.p_output.append(p_out)
+                self.i_output.append(i_out)
+                self.d_output.append(d_out)
+                self.output.append(out)
+                self.err.append(err)
+                self.dt.append(dt)
+                self.dedt.append(dedt)
+                self.integral.append(self.cumsum)
+                return out
 
             return pid_func
         else:

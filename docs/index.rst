@@ -74,6 +74,9 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
 
    from msrDynamics import Node, System 
 
+   # instantiate system object
+   ARE = System()
+
    # mass, kg
    m_fuel_core      = 100.0
    m_coolant_core   = 100.0
@@ -83,18 +86,55 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    # specific heat capacity MW/°K 
    scp_fuel      = 2.0e-3
    scp_coolant   = 4.0e-3
-   scp_moderator = 2.0e-3 
+   scp_moderator = 2.0e-3
+   scp_tubes     = 0.5e-3 
 
    # flow rate, kg/s
    W_fuel    = 100.0
    W_coolant = 50.0
 
+   # convection heat transfer coefficients, MW/°K
+   hA_fuel_tubes = 0.1
+   hA_coolant_tubes = 0.4
+
+   # power in MW & fraction of power generated in fuel nodes
+   P = 2.0  
+   P_f_1 = 0.5*P
+   P_f_2 = 0.5*P
+
    # define nodes
    fuel_1 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
    fuel_2 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
-
+   fuel_tubes = Node(m = m_tubes_core, scp = scp_tubes)
    coolant_1 = Node(m = m_coolant_core/2, scp = scp_coolant, W = W_coolant)
    coolant_2 = Node(m = m_coolant_core/2, scp = scp_coolant, W = W_coolant)
+   moderator = Node(m = m_moderator_core/2, scp = scp_moderator)
+
+   # add nodes to system object
+   ARE.add_nodes([fuel_1, fuel_2, fuel_tubes, coolant_1, coolant_2, moderator])
+
+   # define dynamics
+   fuel_1.set_dTdt_advective(source = T_f_in)
+   fuel_1.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_fuel_tubes/2.0])
+   fuel_1.set_dTdt_internal(source = [n.y()], k = [P_f_1])
+   fuel_2.set_dTdt_advective(source = fuel_1.y())
+   fuel_2.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_fuel_tubes/2.0])
+   fuel_2.set_dTdt_internal(source = [n.y()], k = [P_f_2])
+
+   fuel_tubes.set_dTdt_convective(
+                                  source = [fuel_1.y(), fuel_2.y(), coolant_1.y(), coolant_2.y()], 
+                                  hA = [hA_fuel_tubes/2.0, hA_fuel_tubes/2.0, hA_coolant_tubes/2.0, hA_coolant_tubes/2.0]
+                                  )
+
+   coolant_1.set_dTdt_advective(source = T_c_in)
+   coolant_1.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_coolant_tubes/2.0])
+   coolant_2.set_dTdt_advective(source = coolant_1.y())
+   coolant_2.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_coolant_tubes/2.0])
+
+   # define time domain & solve
+   minutes = 5.0
+   T = np.arange(0.0, minutes*60.0, 0.01)
+   sol = ARE.solve(T)
 
 
 API Reference
