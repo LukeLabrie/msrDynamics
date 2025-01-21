@@ -4,3 +4,4 @@ numpy
 chspy
 sympy
 matplotlib
+tqdm

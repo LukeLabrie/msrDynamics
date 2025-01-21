@@ -167,26 +167,31 @@ API Reference
 -------------
 
 .. automodule:: msrDynamics
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.Node
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.System
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.TripCondition
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.PID_loop
+   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
