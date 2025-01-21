@@ -642,10 +642,3 @@ class Node:
             self.dndt_decay += ((n/n0) * rel_yield - lam * self.y())  
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        
-    def add_noise(self, mu: float = 0.0, sigma: float = 1.0):
-        '''
-        Add gaussian noise of mean mu and 
-        '''
-
-        noise = Function()
