@@ -102,7 +102,33 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    P_f_1 = 0.5*P
    P_f_2 = 0.5*P
 
+   # neutronics parameters
+   Lam = 1.32e-04                                                                  # mean generation time (openmc ifp branch)
+   lam = np.array([1.240E-02, 3.05E-02, 1.11E-01, 3.01E-01, 1.140E+00, 3.014E+00]) # precursor decay constants
+   beta = (np.array([0.000223, 0.001457, 0.001307, 0.002628, 0.000766, 0.00023]))  # delayed precursor yield 
+   beta_t = np.sum(beta)                                                           # total delayed neutron fraction
+
+   # initial conditions
+   n_frac0 = 1.0      # initial fractional neutron density n/n0 (n/cm^3/s)
+   
+
+   # ARE
+   beta_fracs = beta/beta_t
+   beta_t = 0.0047 # ORNL-1845 pg. 150
+   beta = np.array([beta_fracs[i]*beta_t for i in range(len(beta))])
+
+   rho_0 = beta_t-sum(np.divide(beta,1+np.divide(1-np.exp(-lam*tau_l),lam*tau_c))) # reactivity change in going from stationary to circulating fuel
+   C0 = beta / Lam * (1.0 / (lam - (np.exp(-lam * tau_l) - 1.0) / tau_c))
+
    # define nodes
+   n = Node(y0 = n_frac0)
+   C1 = Node(y0 = C0[0])
+   C2 = Node(y0 = C0[1])
+   C3 = Node(y0 = C0[2])
+   C4 = Node(y0 = C0[3])
+   C5 = Node(y0 = C0[4])
+   C6 = Node(y0 = C0[5])
+   rho = Node(y0 = rho_0)
    fuel_1 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
    fuel_2 = Node(m = m_fuel_core/2, scp = scp_fuel, W = W_fuel)
    fuel_tubes = Node(m = m_tubes_core, scp = scp_tubes)
@@ -116,10 +142,10 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    # define dynamics
    fuel_1.set_dTdt_advective(source = T_f_in)
    fuel_1.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_fuel_tubes/2.0])
-   fuel_1.set_dTdt_internal(source = [n.y()], k = [P_f_1])
+   fuel_1.set_dTdt_internal(source = [50.0], k = [P_f_1])
    fuel_2.set_dTdt_advective(source = fuel_1.y())
    fuel_2.set_dTdt_convective(source = [fuel_tubes.y()], hA = [hA_fuel_tubes/2.0])
-   fuel_2.set_dTdt_internal(source = [n.y()], k = [P_f_2])
+   fuel_2.set_dTdt_internal(source = [50.0], k = [P_f_2])
 
    fuel_tubes.set_dTdt_convective(
                                   source = [fuel_1.y(), fuel_2.y(), coolant_1.y(), coolant_2.y()], 
@@ -141,31 +167,26 @@ API Reference
 -------------
 
 .. automodule:: msrDynamics
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.Node
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.System
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.TripCondition
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
 
 .. autoclass:: msrDynamics.PID_loop
-   :imported-members:
    :members:
    :undoc-members:
    :show-inheritance:
