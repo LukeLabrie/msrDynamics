@@ -63,7 +63,6 @@ class System:
         self.input_func_names = None
         self.max_delay = None
         self.callback_functions = []
-        self.adjust_diff = True
 
     @property
     def dydt(self):
