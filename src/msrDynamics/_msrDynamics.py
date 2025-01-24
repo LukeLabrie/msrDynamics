@@ -63,6 +63,7 @@ class System:
         self.input_func_names = None
         self.max_delay = None
         self.callback_functions = []
+        self.adjust_diff = True
 
     @property
     def dydt(self):
@@ -209,7 +210,6 @@ class System:
                 a.time -= t_last
             DDE.add_past_points(self.custom_past)
 
-        # DDE.adjust_diff()
         self.integrator = DDE
 
     def add_nodes(self, new_nodes: list):
@@ -253,7 +253,7 @@ class System:
             if n.index == idx:
                 return n
         raise ValueError(f'Node with index {idx} not found')
-
+    
     def solve(self, 
               T, 
               max_delay=1e10, 
@@ -263,7 +263,7 @@ class System:
               min_step = 1e-10, 
               max_step = 10.0,
               md_step = 1e-2,
-              print_times = False):
+              ):
         """
         Solve the system and return the solution matrix.
 
@@ -358,15 +358,15 @@ class System:
                     print(f"limit: {tripped[1]}")
                     break
         else:
-            if max_delay < T[-1]:
-                self.integrator.integrate_blindly(max_delay, md_step)
-                print(f'Integrated blindly up to t = {self.integrator.t}...')
-                with tqdm(total=len(self.integrator.t + T), desc="Integration progress") as pbar:
-                    for t_x in self.integrator.t + T:
-                        y.append(self.integrator.integrate(t_x))
-                        pbar.update(1)  
-            else:
-                y.append(self.integrator.integrate_blindly(max_delay, md_step))
+            self.integrator.integrate_blindly(max_delay, md_step)
+            state_to_md = self.integrator.get_state()
+            self.set_custom_past(state_to_md, t_truncate = self.integrator.t)
+            self.finalize(max_delay = max_delay)
+            self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
+            with tqdm(total=len(T), desc="Integration progress") as pbar:
+                for t_x in T:
+                    y.append(self.integrator.integrate(t_x))
+                    pbar.update(1)
 
         # populate node objects with solutions 
         if populate_nodes:
