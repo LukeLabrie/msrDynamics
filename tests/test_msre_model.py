@@ -143,7 +143,7 @@ def test_msre_model_1MW():
     t_ins = 2500.0
 
     # Load reference data
-    df_simulink = pd.read_excel(f"{os.getcwd()}/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
+    df_simulink = pd.read_excel(f"{os.getcwd()}/tests/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
     i_trans = [i for i in range(len(df_simulink)) if df_simulink['time'][i] >= 2500]
 
     # generate solution using msrDynamics
@@ -172,7 +172,7 @@ def test_msre_model_5MW():
     t_ins = 2500.0
 
     # Load reference data
-    df_simulink = pd.read_excel(f"{os.getcwd()}/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
+    df_simulink = pd.read_excel(f"{os.getcwd()}/tests/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
     i_trans = [i for i in range(len(df_simulink)) if df_simulink['time'][i] >= 2500]
 
     # generate solution using msrDynamics
@@ -188,7 +188,7 @@ def test_msre_model_5MW():
     P_dat = np.array([(k*P)-ref_P for k in n.y_out])
     dP_msrD = P_dat[i_insert]
     dP_simulink = df_simulink['Mux(4)'][i_insert]*P-ref_P_simulink
-    
+
     # compare
     np.testing.assert_allclose(dP_msrD, dP_simulink, rtol=1e-1, atol = 5*1e-2)
 
@@ -201,7 +201,7 @@ def test_msre_model_8MW():
     t_ins = 2500.0
 
     # Load reference data
-    df_simulink = pd.read_excel(f"{os.getcwd()}/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
+    df_simulink = pd.read_excel(f"{os.getcwd()}/tests/msre_data/simulink_msre_{int(P)}MW_U233_insertion.xlsx")
     i_trans = [i for i in range(len(df_simulink)) if df_simulink['time'][i] >= 2500]
 
     # generate solution using msrDynamics
