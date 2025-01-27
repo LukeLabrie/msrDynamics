@@ -25,4 +25,5 @@ jobs:
 
     - name: Run tests
       run: |
+        python -m pip install --no-build-isolation . 
         pytest
