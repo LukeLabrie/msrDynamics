@@ -1,0 +1,9 @@
+jitcdde 
+numpy 
+chspy 
+pytest 
+sympy 
+matplotlib 
+tqdm 
+pandas
+openpyxl
