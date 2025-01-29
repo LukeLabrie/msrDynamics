@@ -4,6 +4,7 @@ import chspy
 import sympy as sp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
+from symengine import Mul
 
 class System:
     """
@@ -261,7 +262,7 @@ class System:
               rel_tol=1e-05, 
               min_step = 1e-10, 
               max_step = 10.0,
-              md_step = 1e-2,
+              md_step = 1e-3,
               ):
         """
         Solve the system and return the solution matrix.
@@ -448,18 +449,26 @@ class Node:
         self.y = None               # JiTCDDE state variable object, to be assigned by System
         self.index = None           # JiTCDDE state variable index, to be assigned by System
         self.y_out = np.array([])   # solution data, to be populated by System
-        self.y_rhs = np.array([])   # solution data, to be populated by System
-        self.trip_conditions = None
+        self._linked_nodes = []     # list of linked nodes
+        self._dydt_linked = 0.0     # sym. expressions for linked nodes
 
     @property
     def dydt(self):
         """float: Symbolic expression for the rate of change of state variables."""
         return self.dTdt_advective + self.dTdt_internal + \
                self.dTdt_convective + self.dndt + self.dcdt + self.drdt + \
-               self._dydt + self.dndt_decay
+               self._dydt + self.dndt_decay + self.dydt_linked
 
     @dydt.setter
     def dydt(self, custom_dydt):
+        if isinstance(custom_dydt, Mul):
+            print(
+            """ Warning: You are setting this node's dynamics equal to that of 
+                another node. If the other node's dynamics are updated, it will 
+                not be propogated to this node. If you wish for updates to be 
+                carried to this node, use Node.set_dydt_node() instead.
+            """
+                )
         self._dydt = custom_dydt
 
     def set_dTdt_advective(self, source):
@@ -482,6 +491,7 @@ class Node:
         else:
             raise ValueError('''Nodes need to be added to a System() object 
                              before setting dynamics.''')
+        # self._dydt += self.dTdt_advective
 
     def set_dTdt_internal(self, source: list, k: list):
         """
@@ -504,6 +514,7 @@ class Node:
                 self.dTdt_internal += k[idx] * s / (self.m * self.scp)
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.dTdt_internal
 
     def set_dTdt_convective(self, source: list, hA: list):
         """
@@ -535,6 +546,7 @@ class Node:
                 self.dTdt_convective += hA[i] * (source[i] - self.y()) / (self.m * self.scp)
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.dTdt_convective
 
     def set_dndt(self, r: y, beta_eff: float, Lambda: float, lam: list, C: list):
         """
@@ -566,6 +578,7 @@ class Node:
             self.dndt = (r - beta_eff) * self.y() / Lambda + precursors
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.dndt
 
     def set_dcdt(self, n: y, beta: float, Lambda: float, lam: float, flow: bool = False, t_c: float = 0.0, t_l: float = 0.0):
         """
@@ -605,6 +618,7 @@ class Node:
                 self.dcdt = source - decay
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.dcdt
 
     def set_drdt(self, sources: list, coeffs: list):
         """
@@ -632,6 +646,7 @@ class Node:
             self.drdt = fb
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.drdt
         
     def set_dndt_decay(self, n: y, n0: float, rel_yield: float, lam: float):
         #check that node has been added to the system
@@ -641,3 +656,23 @@ class Node:
             self.dndt_decay += ((n/n0) * rel_yield - lam * self.y())  
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
+        # self._dydt += self.dndt_decay
+
+    def set_dydt_node(self, nodes: list, coeffs: list = None):
+        """
+        Add dynamics of another node
+        """
+        if coeffs is None:
+            coeffs = [1.0]*len(nodes)
+        for idx, n in enumerate(nodes): 
+            self._linked_nodes.append((coeffs[idx],n))
+
+    @property
+    def dydt_linked(self):
+        """float: Symbolic expression for the rate of change of state variables."""
+        self._dydt_linked = 0.0
+        for coeff, n in self._linked_nodes:
+            self._dydt_linked += (coeff*n.dydt)
+        return self._dydt_linked
+        
+
