@@ -262,7 +262,7 @@ class System:
               rel_tol=1e-05, 
               min_step = 1e-10, 
               max_step = 10.0,
-              md_step = 1e-2,
+              md_step = 1e-3,
               ):
         """
         Solve the system and return the solution matrix.
