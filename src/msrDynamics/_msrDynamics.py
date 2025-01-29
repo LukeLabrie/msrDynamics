@@ -5,6 +5,9 @@ import sympy as sp
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from symengine import Mul
+import sys
+
+MAX_INT = sys.maxsize
 
 class System:
     """
@@ -273,7 +276,6 @@ class System:
         print("finalizing integrator...")
         self.finalize()
         self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
-        
     
     def solve(self, 
               T, 
@@ -400,7 +402,7 @@ class System:
                             md_step = 1e-3,
                             abs_tol_eq = 1e-6,
                             rel_tol_eq = 1e-4,
-                            max_iter = int("inf"),
+                            max_iter = MAX_INT,
                             norm = None,
               ):
         """
@@ -412,11 +414,12 @@ class System:
         if self.trip_conditions:
             raise ValueError('equilibrium_search not compatible with trip conditions')
         
-        T = np.array([])
-        y = np.array([])
+        T = []
+        y = []
+        y0 = np.array([self.nodes[n].y0 for n in self.nodes])
         
         diff = float('inf')
-        tol = abs_tol_eq + rel_tol_eq*diff
+        tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y0, ord = norm)
         iter = 0
         while (diff >= tol) and (iter < max_iter):
             # find time
@@ -427,25 +430,24 @@ class System:
             T.append(t_x)
 
             # calculate state 
-            if t_x <= self.max_delay:
+            if (t_x <= self.max_delay):
                 y.append(self.integrator.integrate_blindly(t_x, step = md_step))
             else:
                 y.append(self.integrator.integrate(t_x))
 
             # update error & tolerance
             if len(y) == 1:
-                y0 = np.array([self.nodes[n].y0 for n in self.nodes])
-                diff = np.linalg.norm(y[-1]-y0, norm = norm)
+                diff = np.linalg.norm(y[-1]-y0, ord = norm)
             else:
-                diff = np.linalg.norm(y[-1]-y[-2], norm)
-            tol = abs_tol_eq + rel_tol_eq*diff
+                diff = np.linalg.norm(y[-1]-y[-2], ord = norm)
+            tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y[-1])
 
         # populate node objects with solutions, off by default, as it can cause
         # memory blowup/leakage when running many models 
         if populate_nodes:
             self._populate_nodes(y)            
 
-        return y
+        return T, np.array(y)
 
     def _populate_nodes(self, sol):
         print('populating nodes objects solution vectors...')
