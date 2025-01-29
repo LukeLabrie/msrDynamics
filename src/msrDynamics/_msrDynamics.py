@@ -358,13 +358,11 @@ class System:
                     print(f"limit: {tripped[1]}")
                     break
         else:
-            self.integrator.integrate_blindly(max_delay, md_step)
-            state_to_md = self.integrator.get_state()
-            self.set_custom_past(state_to_md, t_truncate = self.integrator.t)
-            self.finalize(max_delay = max_delay)
-            self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
             with tqdm(total=len(T), desc="Integration progress") as pbar:
-                for t_x in T:
+                for t_x in T[T<=max_delay]:
+                    y.append(self.integrator.integrate_blindly(t_x))
+                    pbar.update(1)
+                for t_x in T[T>max_delay]:
                     y.append(self.integrator.integrate(t_x))
                     pbar.update(1)
 
@@ -491,7 +489,6 @@ class Node:
         else:
             raise ValueError('''Nodes need to be added to a System() object 
                              before setting dynamics.''')
-        # self._dydt += self.dTdt_advective
 
     def set_dTdt_internal(self, source: list, k: list):
         """
@@ -514,7 +511,6 @@ class Node:
                 self.dTdt_internal += k[idx] * s / (self.m * self.scp)
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.dTdt_internal
 
     def set_dTdt_convective(self, source: list, hA: list):
         """
@@ -546,7 +542,6 @@ class Node:
                 self.dTdt_convective += hA[i] * (source[i] - self.y()) / (self.m * self.scp)
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.dTdt_convective
 
     def set_dndt(self, r: y, beta_eff: float, Lambda: float, lam: list, C: list):
         """
@@ -578,7 +573,6 @@ class Node:
             self.dndt = (r - beta_eff) * self.y() / Lambda + precursors
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.dndt
 
     def set_dcdt(self, n: y, beta: float, Lambda: float, lam: float, flow: bool = False, t_c: float = 0.0, t_l: float = 0.0):
         """
@@ -618,7 +612,6 @@ class Node:
                 self.dcdt = source - decay
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.dcdt
 
     def set_drdt(self, sources: list, coeffs: list):
         """
@@ -646,7 +639,6 @@ class Node:
             self.drdt = fb
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.drdt
         
     def set_dndt_decay(self, n: y, n0: float, rel_yield: float, lam: float):
         #check that node has been added to the system
@@ -656,8 +648,7 @@ class Node:
             self.dndt_decay += ((n/n0) * rel_yield - lam * self.y())  
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
-        # self._dydt += self.dndt_decay
-
+        
     def set_dydt_node(self, nodes: list, coeffs: list = None):
         """
         Add dynamics of another node
