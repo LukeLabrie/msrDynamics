@@ -360,7 +360,7 @@ class System:
         else:
             with tqdm(total=len(T), desc="Integration progress") as pbar:
                 for t_x in T[T<=max_delay]:
-                    y.append(self.integrator.integrate_blindly(t_x))
+                    y.append(self.integrator.integrate_blindly(t_x, step = md_step))
                     pbar.update(1)
                 for t_x in T[T>max_delay]:
                     y.append(self.integrator.integrate(t_x))
