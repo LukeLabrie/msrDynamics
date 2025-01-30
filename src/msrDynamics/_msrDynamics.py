@@ -447,7 +447,7 @@ class System:
 
         if show_conv_metrics:
             print(f"converged after {iters} iterations at tol = {tol}")
-            print(f"y_k - y_{{k-1}} = {diff}")
+            print(f"||y_k - y_{{k-1}}||_2 = {diff}")
 
         # populate node objects with solutions, off by default, as it can cause
         # memory blowup/leakage when running many models 
