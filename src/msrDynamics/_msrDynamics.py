@@ -446,7 +446,7 @@ class System:
             iters += 1
 
         if show_conv_metrics:
-            print(f"converged after {iters} iterations at tol = {tol}")
+            print(f"converged at t = {T[-1]} after {iters} iterations at tol = {tol}")
             print(f"||y_k - y_{{k-1}}||_2 = {diff}")
 
         # populate node objects with solutions, off by default, as it can cause
