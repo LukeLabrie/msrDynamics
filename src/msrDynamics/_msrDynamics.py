@@ -405,6 +405,7 @@ class System:
                             rel_tol_eq = 1e-4,
                             max_iter = MAX_INT,
                             norm = None,
+                            show_conv_metrics = False
               ):
         """
         Solves until equilibrium condition reached
@@ -421,8 +422,8 @@ class System:
         
         diff = float('inf')
         tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y0, ord = norm)
-        iter = 0
-        while (diff >= tol) and (iter < max_iter):
+        iters = 0
+        while (diff >= tol) and (iters < max_iter):
             # find time
             if len(T) == 0:
                 t_x = dT
@@ -442,6 +443,11 @@ class System:
             else:
                 diff = np.linalg.norm(y[-1]-y[-2], ord = norm)
             tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y[-1], ord = norm)
+            iters += 1
+
+        if show_conv_metrics:
+            print(f"converged after {iters} iterations at tol = {tol}")
+            print(f"y_k - y_{{k-1}} = {diff}")
 
         # populate node objects with solutions, off by default, as it can cause
         # memory blowup/leakage when running many models 
