@@ -441,7 +441,7 @@ class System:
                 diff = np.linalg.norm(y[-1]-y0, ord = norm)
             else:
                 diff = np.linalg.norm(y[-1]-y[-2], ord = norm)
-            tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y[-1])
+            tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y[-1], ord = norm)
 
         # populate node objects with solutions, off by default, as it can cause
         # memory blowup/leakage when running many models 
