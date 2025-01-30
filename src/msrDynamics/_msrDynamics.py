@@ -323,6 +323,7 @@ class System:
         return np.array(y)
 
     def _solve_default(self, times, md_step):
+        y = []
         with tqdm(total=len(times), desc="Integration progress") as pbar:
             for t_x in times[times<=self.max_delay]:
                 y.append(self.integrator.integrate_blindly(t_x, step = md_step))
