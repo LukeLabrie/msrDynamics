@@ -334,9 +334,9 @@ class System:
         return np.array(y)
 
     def _solve_with_trip_conditions(self, times, md_step):
-
+        y = []
         # integrate with trip conditions
-        for t_x in times:
+        for t_idx, t_x in enumerate(times):
             # extract state and derivs for trip check 
             if (t_x <= self.max_delay):
                 y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
@@ -347,7 +347,7 @@ class System:
 
             # derivative is only estimated after the first step 
             if len(y) > 1:
-                derivs = ((y[-1]-y[-2])/(T[1]-T[0]))[idxs]
+                derivs = ((y[-1]-y[-2])/(times[t_idx]-times[t_idx-1]))[idxs]
             else:
                 derivs = [0.0]*len(states)
             
@@ -355,7 +355,7 @@ class System:
                 self.trip_info['state'].extend([chspy.Anchor(t_x, states, derivs)])
             else:
                 self.trip_info['state'] = chspy.CubicHermiteSpline(n=len(self.trip_conditions), 
-                                                        anchors=[chspy.Anchor(t_x, states, derivs)])
+                                                     anchors=[chspy.Anchor(t_x, states, derivs)])
 
             # check if system has tripped
             tripped = self._check_trip(t_x, states, derivs)
@@ -391,6 +391,7 @@ class System:
                 print(f"state idx: {tripped[0]}")
                 print(f"limit: {tripped[1]}")
                 break
+        return np.array(y)
 
     def equilibrium_search(self, 
                             dT, 
@@ -546,14 +547,16 @@ class Node:
 
     @dydt.setter
     def dydt(self, custom_dydt):
-        if isinstance(custom_dydt, Mul):
-            print(
-            """ Warning: You are setting this node's dynamics equal to that of 
-                another node. If the other node's dynamics are updated, it will 
-                not be propogated to this node. If you wish for updates to be 
-                carried to this node, use Node.set_dydt_node() instead.
-            """
-                )
+        # TODO: This error message shows anytime custom dydt is set, not just 
+        #       when setting equal to another node. Rethink check. 
+        # if isinstance(custom_dydt, Mul):
+        #     print(
+        #     """ Warning: You are setting this node's dynamics equal to that of 
+        #         another node. If the other node's dynamics are updated, it will 
+        #         not be propogated to this node. If you wish for updates to be 
+        #         carried to this node, use Node.set_dydt_node() instead.
+        #     """
+        #         )
         self._dydt = custom_dydt
 
     def set_dTdt_advective(self, source):
