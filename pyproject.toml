@@ -17,7 +17,7 @@ classifiers = [
     "Environment :: Console",
 ]
 dependencies = [
-    "jitcdde",
+    "jitcdde>1.8.1",
     "numpy",
     "chspy"
 ]
