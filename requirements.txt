@@ -1,4 +1,4 @@
-git+https://github.com/neurophysik/jitcdde.git@master
+jitcdde>=1.8.2
 numpy 
 chspy 
 pytest 
