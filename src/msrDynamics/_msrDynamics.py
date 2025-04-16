@@ -235,6 +235,7 @@ class System:
                 self.nodes[index] = n
             self.n_nodes += 1
             index += 1
+            n.in_system = True
 
     def get_state_by_index(self, i: int, j: int):
         """
