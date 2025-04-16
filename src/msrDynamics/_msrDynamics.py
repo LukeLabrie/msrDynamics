@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 from symengine import Mul
 import sys
+import gc
 
 MAX_INT = sys.maxsize
 
@@ -537,6 +538,7 @@ class Node:
         self.y_out = np.array([])   # solution data, to be populated by System
         self._linked_nodes = []     # list of linked nodes
         self._dydt_linked = 0.0     # sym. expressions for linked nodes
+        self.in_system = False      # flag to check if node has been added to system
 
     @property
     def dydt(self):
@@ -570,6 +572,9 @@ class Node:
         if self.dndt or self.dcdt or self.drdt:
             raise ValueError('''This node has already been assigned 
                              point-kinetic dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         
         #check that node has been added to the system
         if self.y:
@@ -592,6 +597,9 @@ class Node:
         if self.dndt or self.dcdt or self.drdt:
             raise ValueError('''This node has already been assigned 
                              point-kinetic dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         
         #check that node has been added to the system
         if self.y:
@@ -614,6 +622,9 @@ class Node:
         if self.dndt or self.dcdt or self.drdt:
             raise ValueError('''This node has already been assigned 
                              point-kinetic dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         if (self.m <= 0.0) or (self.scp <= 0.0):
             print(f'node mass: {self.m:.2f}')
             print(f'node specific heat capacity: {self.scp:.2f}')
@@ -652,6 +663,9 @@ class Node:
            self.dcdt:
             raise ValueError('''This node has already been assigned 
                              incompatible dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         
         #check that node has been added to the system
         if self.y:
@@ -688,6 +702,9 @@ class Node:
            self.dndt:
             raise ValueError('''This node has already been assigned 
                              incompatible dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         #check that node has been added to the system
         if self.y:
             # reset in case of update
@@ -719,6 +736,9 @@ class Node:
            self.dcdt:
             raise ValueError('''This node has already been assigned 
                              incompatible dynamics''')
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         #check that node has been added to the system
         if self.y:
             # reset in case of update
@@ -731,6 +751,9 @@ class Node:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
         
     def set_dndt_decay(self, n: y, n0: float, rel_yield: float, lam: float):
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         #check that node has been added to the system
         if self.y:
             # reset in case of update
@@ -743,6 +766,9 @@ class Node:
         """
         Add dynamics of another node
         """
+        if not self.in_system:
+            raise ValueError('''Node dynamics cannot be set until added to 
+                                a System() object''')
         if coeffs is None:
             coeffs = [1.0]*len(nodes)
         for idx, n in enumerate(nodes): 

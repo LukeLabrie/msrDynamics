@@ -46,6 +46,7 @@ class PID_loop:
                  bound: tuple = None,
                  clegg_integrator: bool = False,
                  min_reading: float = None,
+                 store_all_output: bool = False,
                  ) -> None:
         """
         Initializes the PID_loop object.
@@ -83,96 +84,126 @@ class PID_loop:
         self.output_sym = Function(self.name)
         self._output_func = None
         self.cumsum = 0.0
-        self.p_output = []
-        self.i_output = []
-        self.d_output = []
-        self.output = []
-        self.err = []
-        self.dt = []
-        self.times = []
+        if store_all_output:
+            self.times = []
+            self.output = []
+            self.state = []
+            self.p_output = []
+            self.i_output = []
+            self.d_output = []
+            self.err = []
+            self.dt = []
+            self.dedt = []
+            self.integral = []
+        else:
+            self.times = None
+            self.output = None
+            self.state = None
+            self.p_output = None
+            self.i_output = None
+            self.d_output = None
+            self.err = None
+            self.dt = None
+            self.dedt = None
+            self.integral = None
+
         self.err_prev = None
-        self.dedt = []
-        self.state = []
         self.bound = bound
         self.clegg_integrator = clegg_integrator
         self.de_prev = None
         self.min_reading = min_reading
-        self.integral = []
+        self.store_all_output = store_all_output
+        self.t_prev = None
+        self.out_prev = None
 
-    @property
-    def output_func(self):
-        """
-        Generates or returns the PID controller function.
+        def output_func(self):
+            """
+            Generates or returns the PID controller function.
 
-        Returns:
-            callable: A function implementing the PID control logic.
-        """
-        if self._output_func is None:
-            def pid_func(y, state, t):
-                """
-                PID control logic for calculating the output.
+            Returns:
+                callable: A function implementing the PID control logic.
+            """
+            if self._output_func is None:
+                def pid_func(y, state, t):
+                    """
+                    PID control logic for calculating the output.
 
-                Args:
-                    y (float): Current output value.
-                    state (float): Current state value.
-                    t (float): Current time.
+                    Args:
+                        y (float): Current output value.
+                        state (float): Current state value.
+                        t (float): Current time.
 
-                Returns:
-                    float: PID control output value.
-                """
+                    Returns:
+                        float: PID control output value.
+                    """
 
-                dt = t - self.times[-1] if self.times else t
-                if (self.min_reading) and (state < self.min_reading):
-                    p_out, i_out, d_out, out, err, dedt = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
-                else:
-                    # p
-                    err = state - self.setpoint_value
-                    if self.err_prev and self.clegg_integrator:
-                        if np.sign(self.err_prev) != np.sign(err):
-                            self.cumsum = 0.0
-                    # i
-                    self.cumsum += err*dt
-                    # d
-                    de = err - self.err_prev if self.err_prev is not None else 0.0
-                    if dt == 0.0:
-                        out = self.output[-1] if self.output else 0.0
-                        return out
-                    dedt = de / dt
-
-                    p_out = self.k_p*err
-                    i_out = self.k_i*self.cumsum
-                    d_out = self.k_d*dedt
-                    calc = p_out + d_out + i_out + self.base_value
-
-                    if self.bound:
-                        out = max(self.bound[0], min(calc, self.bound[1]))
+                    # unpack attributes for performance
+                    t_prev = self.t_prev
+                    min_reading = self.min_reading
+                    setpoint_value = self.setpoint_value
+                    err_prev = self.err_prev
+                    ci = self.clegg_integrator
+                    out_prev = self.out_prev
+                    k_p = self.k_p
+                    k_i = self.k_i
+                    k_d = self.k_d
+                    base_value = self.base_value
+                    bound = self.bound
+                    dt = t - t_prev if t_prev else t
+                    if (min_reading) and (state < min_reading):
+                        p_out, i_out, d_out, out, err, dedt = 0.0, 0.0, 0.0, 0.0, 0.0, 0.0
                     else:
-                        out = calc
+                        # p
+                        err = state - setpoint_value
+                        if err_prev and ci:
+                            if np.sign(err_prev) != np.sign(err):
+                                self.cumsum = 0.0
+                        # i
+                        self.cumsum += err*dt
+                        # d
+                        de = err - err_prev if err_prev is not None else 0.0
+                        if dt == 0.0:
+                            out = out_prev if out_prev else 0.0
+                            return out
+                        dedt = de / dt
 
-                # store inputs/outputs
-                self.err_prev = err
-                self.state.append(state)
-                self.times.append(t)
-                self.p_output.append(p_out)
-                self.i_output.append(i_out)
-                self.d_output.append(d_out)
-                self.output.append(out)
-                self.err.append(err)
-                self.dt.append(dt)
-                self.dedt.append(dedt)
-                self.integral.append(self.cumsum)
-                return out
+                        p_out = k_p*err
+                        i_out = k_i*self.cumsum
+                        d_out = k_d*dedt
+                        calc = p_out + d_out + i_out + base_value
 
-            return pid_func
-        else:
-            return self._output_func
+                        if bound:
+                            out = max(bound[0], min(calc, bound[1]))
+                        else:
+                            out = calc
 
-    @output_func.setter
-    def output_func(self, custom_output_func):
-        """
-        Sets a custom function for the PID output logic.
+                    # store inputs/outputs
+                    self.err_prev = err
+                    self.t_prev = t
+                    self.out_prev = out
+                    if self.store_all_output:
+                        self.times.append(t)
+                        self.output.append(out)
+                        self.state.append(state)
+                        self.p_output.append(p_out)
+                        self.i_output.append(i_out)
+                        self.d_output.append(d_out)
+                        self.err.append(err)
+                        self.dt.append(dt)
+                        self.dedt.append(dedt)
+                        self.integral.append(self.cumsum)
+                    return out
 
-        Args:
-            custom_output_func (callable): Custom PID logic function.
-        """
-        self._output_func = custom_output_func
+                return pid_func
+            
+        self.output_func = output_func(self)
+
+    # @output_func.setter
+    # def output_func(self, custom_output_func):
+    #     """
+    #     Sets a custom function for the PID output logic.
+
+    #     Args:
+    #         custom_output_func (callable): Custom PID logic function.
+    #     """
+    #     self._output_func = custom_output_func
