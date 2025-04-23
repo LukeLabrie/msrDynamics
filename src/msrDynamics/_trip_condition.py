@@ -17,7 +17,8 @@ class TripCondition:
                  bounds=(-float('inf'), float('inf')),
                  idx=None,
                  check_after=None,
-                 delay=None) -> None:
+                 delay=None,
+                 name = None) -> None:
         """
         Initialize a TripCondition instance.
 
@@ -39,6 +40,10 @@ class TripCondition:
         self.idx = idx
         self.check_after = check_after
         self.delay = delay
+        if name:
+            self.name = name
+        else: 
+            self.name = f"trip obj {self.idx}"
 
     def _check_type(self, trip_type):
         """
