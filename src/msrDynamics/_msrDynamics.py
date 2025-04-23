@@ -338,61 +338,63 @@ class System:
     def _solve_with_trip_conditions(self, times, md_step):
         y = []
         # integrate with trip conditions
-        for t_idx, t_x in enumerate(times):
-            # extract state and derivs for trip check 
-            if (t_x <= self.max_delay):
-                y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
-            else:
-                y.append(np.array(self.integrator.integrate(t_x)))
-            idxs = [c.idx for c in self.trip_conditions]
-            states = y[-1][idxs]
-
-            # derivative is only estimated after the first step 
-            if len(y) > 1:
-                derivs = ((y[-1]-y[-2])/(times[t_idx]-times[t_idx-1]))[idxs]
-            else:
-                derivs = [0.0]*len(states)
-            
-            if 'state' in self.trip_info:
-                self.trip_info['state'].extend([chspy.Anchor(t_x, states, derivs)])
-            else:
-                self.trip_info['state'] = chspy.CubicHermiteSpline(n=len(self.trip_conditions), 
-                                                     anchors=[chspy.Anchor(t_x, states, derivs)])
-
-            # check if system has tripped
-            tripped = self._check_trip(t_x, states, derivs)
-            if tripped:
-                # get trip condition object
-                trip_obj = self.trip_conditions[tripped[0]]
-                print(f'{trip_obj.name} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
-
-                # store trip info 
-                self.trip_info['tripped'] = True
-                self.trip_info['idx'] = trip_obj.idx
-                self.trip_info['limit'] = tripped[1]
-                self.trip_info['type'] = trip_obj.trip_type
-
-                # get system spline
-                print('getting state...')
-                state = self.integrator.get_state()
-
-                # calculate exact trip time using splines 
-                print('computing trip time within interval...')
-                trip_sol = []
-                start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
-                solve_diff = True if self.trip_info['type'] == 'diff' else False
-                trip_sol = state.solve(self.trip_info['idx'],
-                                        self.trip_info['limit'],
-                                        beginning=start,
-                                        solve_derivative = solve_diff)
-                if trip_obj.delay:
-                    self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
+        with tqdm(total=len(times), desc="Integration progress") as pbar:
+            for t_idx, t_x in enumerate(times):
+                # extract state and derivs for trip check 
+                if (t_x <= self.max_delay):
+                    y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
                 else:
-                    self.trip_info['time'] = trip_sol[0][0] 
-                print(f"tripped at t = {self.trip_info['time']:.3f}")
-                print(f"state idx: {tripped[0]}")
-                print(f"limit: {tripped[1]}")
-                break
+                    y.append(np.array(self.integrator.integrate(t_x)))
+                idxs = [c.idx for c in self.trip_conditions]
+                states = y[-1][idxs]
+
+                # derivative is only estimated after the first step 
+                if len(y) > 1:
+                    derivs = ((y[-1]-y[-2])/(times[t_idx]-times[t_idx-1]))[idxs]
+                else:
+                    derivs = [0.0]*len(states)
+                
+                if 'state' in self.trip_info:
+                    self.trip_info['state'].extend([chspy.Anchor(t_x, states, derivs)])
+                else:
+                    self.trip_info['state'] = chspy.CubicHermiteSpline(n=len(self.trip_conditions), 
+                                                        anchors=[chspy.Anchor(t_x, states, derivs)])
+
+                # check if system has tripped
+                tripped = self._check_trip(t_x, states, derivs)
+                pbar.update(1)
+                if tripped:
+                    # get trip condition object
+                    trip_obj = self.trip_conditions[tripped[0]]
+                    print(f'{trip_obj.name} tripped after integration to t = {t_x:3f} with a value of {tripped[1]}')
+
+                    # store trip info 
+                    self.trip_info['tripped'] = True
+                    self.trip_info['idx'] = trip_obj.idx
+                    self.trip_info['limit'] = tripped[1]
+                    self.trip_info['type'] = trip_obj.trip_type
+
+                    # get system spline
+                    print('getting state...')
+                    state = self.integrator.get_state()
+
+                    # calculate exact trip time using splines 
+                    print('computing trip time within interval...')
+                    trip_sol = []
+                    start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
+                    solve_diff = True if self.trip_info['type'] == 'diff' else False
+                    trip_sol = state.solve(self.trip_info['idx'],
+                                            self.trip_info['limit'],
+                                            beginning=start,
+                                            solve_derivative = solve_diff)
+                    if trip_obj.delay:
+                        self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
+                    else:
+                        self.trip_info['time'] = trip_sol[0][0] 
+                    print(f"tripped at t = {self.trip_info['time']:.3f}")
+                    print(f"state idx: {tripped[0]}")
+                    print(f"limit: {tripped[1]}")
+                    break
         return np.array(y)
 
     def equilibrium_search(self, 
