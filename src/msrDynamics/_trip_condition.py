@@ -1,4 +1,4 @@
-TRIP_TYPES = ['state', 'diff']
+TRIP_TYPES = ['state', 'diff', 'diff_rel']
 
 class TripCondition:
     """

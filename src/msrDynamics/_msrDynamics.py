@@ -121,6 +121,8 @@ class System:
                     s = state[idx]
                 elif trip_obj.trip_type == 'diff':
                     s = diff[idx]
+                elif trip_obj.trip_type == 'diff_rel':
+                    s = diff[idx]/state[idx]
                 else:
                     raise ValueError('''Invalid trip type. Currently supported 
                                        are 'state' and 'diff'.''')
@@ -178,7 +180,7 @@ class System:
             past.truncate(t_truncate)
         self.custom_past = past
 
-    def finalize(self):
+    def finalize(self, times):
         """
         Instantiate and store JiTCDDE integrator.
 
@@ -206,7 +208,7 @@ class System:
         # set initial conditions
         if not self.custom_past:
             self.y0 = [n.y0 for n in self.nodes.values()]
-            DDE.constant_past(self.y0)
+            DDE.constant_past(self.y0, time = times[0])
         else:
             # shift past time to end at t = 0
             t_last = self.custom_past[-1].time
@@ -260,6 +262,7 @@ class System:
         raise ValueError(f'Node with index {idx} not found')
     
     def _prepare_integrator(self, 
+                            times,
                             abs_tol=1e-10, 
                             rel_tol=1e-05, 
                             min_step = 1e-10, 
@@ -276,7 +279,7 @@ class System:
 
         # set integrator 
         print("finalizing integrator...")
-        self.finalize()
+        self.finalize(times)
         self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
     
     def solve(self, 
@@ -308,7 +311,7 @@ class System:
             np.ndarray: Solution matrix.
         """
         self.max_delay = max_delay
-        self._prepare_integrator(abs_tol, rel_tol, min_step, max_step)
+        self._prepare_integrator(T, abs_tol, rel_tol, min_step, max_step)
 
         print("integrating...")
         # solve
@@ -327,10 +330,10 @@ class System:
     def _solve_default(self, times, md_step):
         y = []
         with tqdm(total=len(times), desc="Integration progress") as pbar:
-            for t_x in times[times<=self.max_delay]:
+            for t_x in times[times<=(self.max_delay+times[0])]:
                 y.append(self.integrator.integrate_blindly(t_x, step = md_step))
                 pbar.update(1)
-            for t_x in times[times>self.max_delay]:
+            for t_x in times[times>(self.max_delay+times[0])]:
                 y.append(self.integrator.integrate(t_x))
                 pbar.update(1)
         return np.array(y)
@@ -341,7 +344,7 @@ class System:
         with tqdm(total=len(times), desc="Integration progress") as pbar:
             for t_idx, t_x in enumerate(times):
                 # extract state and derivs for trip check 
-                if (t_x <= self.max_delay):
+                if (t_x <= (self.max_delay+times[0])):
                     y.append(np.array(self.integrator.integrate_blindly(t_x, step = md_step)))
                 else:
                     y.append(np.array(self.integrator.integrate(t_x)))
@@ -350,7 +353,7 @@ class System:
 
                 # derivative is only estimated after the first step 
                 if len(y) > 1:
-                    derivs = ((y[-1]-y[-2])/(times[t_idx]-times[t_idx-1]))[idxs]
+                    derivs = (((y[-1]-y[-2])/(times[t_idx]-times[t_idx-1])))[idxs]
                 else:
                     derivs = [0.0]*len(states)
                 
@@ -373,6 +376,7 @@ class System:
                     self.trip_info['idx'] = trip_obj.idx
                     self.trip_info['limit'] = tripped[1]
                     self.trip_info['type'] = trip_obj.trip_type
+                    self.trip_info['t_last'] = t_x
 
                     # get system spline
                     print('getting state...')
@@ -381,12 +385,10 @@ class System:
                     # calculate exact trip time using splines 
                     print('computing trip time within interval...')
                     trip_sol = []
-                    start = trip_obj.check_after if trip_obj.check_after is not None else state[0].time
                     solve_diff = True if self.trip_info['type'] == 'diff' else False
                     trip_sol = state.solve(self.trip_info['idx'],
-                                            self.trip_info['limit'],
-                                            beginning=start,
-                                            solve_derivative = solve_diff)
+                                           self.trip_info['limit'],
+                                           solve_derivative = solve_diff)
                     if trip_obj.delay:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
