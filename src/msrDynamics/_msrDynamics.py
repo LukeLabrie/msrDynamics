@@ -180,7 +180,7 @@ class System:
             past.truncate(t_truncate)
         self.custom_past = past
 
-    def finalize(self, times):
+    def finalize(self, start_time):
         """
         Instantiate and store JiTCDDE integrator.
 
@@ -208,7 +208,7 @@ class System:
         # set initial conditions
         if not self.custom_past:
             self.y0 = [n.y0 for n in self.nodes.values()]
-            DDE.constant_past(self.y0, time = times[0])
+            DDE.constant_past(self.y0, time = start_time)
         else:
             # shift past time to end at t = 0
             t_last = self.custom_past[-1].time
@@ -262,7 +262,7 @@ class System:
         raise ValueError(f'Node with index {idx} not found')
     
     def _prepare_integrator(self, 
-                            times,
+                            start_time=0.0,
                             abs_tol=1e-10, 
                             rel_tol=1e-05, 
                             min_step = 1e-10, 
@@ -279,7 +279,7 @@ class System:
 
         # set integrator 
         print("finalizing integrator...")
-        self.finalize(times)
+        self.finalize(start_time)
         self.integrator.set_integration_parameters(atol=abs_tol, rtol=rel_tol, min_step = min_step, max_step = max_step)
     
     def solve(self, 
@@ -311,7 +311,7 @@ class System:
             np.ndarray: Solution matrix.
         """
         self.max_delay = max_delay
-        self._prepare_integrator(T, abs_tol, rel_tol, min_step, max_step)
+        self._prepare_integrator(T[0], abs_tol, rel_tol, min_step, max_step)
 
         print("integrating...")
         # solve
@@ -412,13 +412,14 @@ class System:
                             rel_tol_eq = 1e-4,
                             max_iter = MAX_INT,
                             norm = None,
-                            show_conv_metrics = False
+                            show_conv_metrics = False,
+                            start_time = 0.0
               ):
         """
         Solves until equilibrium condition reached
         """
         self.max_delay = max_delay
-        self._prepare_integrator(abs_tol, rel_tol, min_step, max_step)
+        self._prepare_integrator(start_time, abs_tol, rel_tol, min_step, max_step)
 
         if self.trip_conditions:
             raise ValueError('equilibrium_search not compatible with trip conditions')
@@ -683,7 +684,14 @@ class Node:
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
-    def set_dcdt(self, n: y, beta: float, Lambda: float, lam: float, flow: bool = False, t_c: float = 0.0, t_l: float = 0.0):
+    def set_dcdt(self, 
+                 n: y, beta: float, 
+                 Lambda: float, 
+                 lam: float, 
+                 flow: bool = False, 
+                 t_c: float = 0.0, 
+                 t_l: float = 0.0,
+                 force_steady_state: bool = False):
         """
         Set the rate of change of precursor concentration.
 
@@ -716,9 +724,13 @@ class Node:
             self.dcdt = 0.0
             source = n * beta / Lambda
             decay = lam * self.y()
-            if flow:
+            if flow and force_steady_state:
                 outflow = self.y() / t_c
                 inflow = self.y(t - t_l) * sp.exp(-lam * t_l) / t_c
+                self.dcdt = source - decay - outflow + inflow
+            elif flow and (not force_steady_state):
+                outflow = self.y() / t_c
+                inflow = (self.y() / t_c) * (1 - sp.exp(-lam * t_l) / t_c)
                 self.dcdt = source - decay - outflow + inflow
             else:
                 self.dcdt = source - decay
