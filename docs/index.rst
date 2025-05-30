@@ -175,14 +175,14 @@ Advanced Features
 
 Inputs
 ^^^^^^^^^^^^^^^^
-The `jitcdde` backend supports several representations of input. Users are referred to the 
+The ``jitcdde`` backend supports several representations of input. Users are referred to the 
 `jitcdde documentation <https://jitcdde.readthedocs.io/en/stable/>`_ for more detail. An example file can be found 
-`here <https://github.com/neurophysik/jitcdde/blob/master/examples/mackey_glass_parameter_jump.py>`_. `jitcdde`-compatible representations of input
-can be given as arguments to the helper functions of `msrDynamics.Node`
+`here <https://github.com/neurophysik/jitcdde/blob/master/examples/mackey_glass_parameter_jump.py>`_. ``jitcdde``-compatible representations of input
+can be given as arguments to the helper functions of ``msrDynamics.Node``
 
 Trip Conditions
 ^^^^^^^^^^^^^^^^
-The user can impose operating limits on the state variables using `msrDynamics.TripCondition`. When trip conditions are added to the 
+The user can impose operating limits on the state variables using ``msrDynamics.TripCondition``. When trip conditions are added to the 
 system, integration will stop when the condition is reached, and the time at which the condition is reached will be estimated with a cubic 
 interpolation of the anchor points closest to the trip time. 
 
