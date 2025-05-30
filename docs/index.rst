@@ -97,6 +97,14 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    hA_fuel_tubes = 0.1
    hA_coolant_tubes = 0.4
 
+   # delays 
+   tau_c = 12.0
+   tau_l = 16.0
+
+   # inlet temperatures
+   T_f_in = 650
+   T_c_in = 500
+
    # power in MW & fraction of power generated in fuel nodes
    P = 2.0  
    P_f_1 = 0.5*P
@@ -107,16 +115,13 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    lam = np.array([1.240E-02, 3.05E-02, 1.11E-01, 3.01E-01, 1.140E+00, 3.014E+00]) # precursor decay constants
    beta = (np.array([0.000223, 0.001457, 0.001307, 0.002628, 0.000766, 0.00023]))  # delayed precursor yield 
    beta_t = np.sum(beta)                                                           # total delayed neutron fraction
-
-   # initial conditions
-   n_frac0 = 1.0      # initial fractional neutron density n/n0 (n/cm^3/s)
-   
-
    # ARE
    beta_fracs = beta/beta_t
    beta_t = 0.0047 # ORNL-1845 pg. 150
    beta = np.array([beta_fracs[i]*beta_t for i in range(len(beta))])
 
+   # initial conditions (analytical steady-state solutions)
+   n_frac0 = 1.0      # initial fractional neutron density n/n0 (n/cm^3/s)
    rho_0 = beta_t-sum(np.divide(beta,1+np.divide(1-np.exp(-lam*tau_l),lam*tau_c))) # reactivity change in going from stationary to circulating fuel
    C0 = beta / Lam * (1.0 / (lam - (np.exp(-lam * tau_l) - 1.0) / tau_c))
 
@@ -137,7 +142,8 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    moderator = Node(m = m_moderator_core/2, scp = scp_moderator)
 
    # add nodes to system object
-   ARE.add_nodes([fuel_1, fuel_2, fuel_tubes, coolant_1, coolant_2, moderator])
+   ARE.add_nodes([n, C2, C2, C3, C4, C5, C6, rho, fuel_1, fuel_2, fuel_tubes, 
+                  coolant_1, coolant_2, moderator])
 
    # define dynamics
    fuel_1.set_dTdt_advective(source = T_f_in)
@@ -160,7 +166,33 @@ transfer, as well as generation from point-kinetics. User-defined dynamics are s
    # define time domain & solve
    minutes = 5.0
    T = np.arange(0.0, minutes*60.0, 0.01)
-   sol = ARE.solve(T)
+   sol = ARE.solve(T, populate_nodes = True)
+
+Note, the `source` argument of `set_dTdt_advective()` can either be a constant float, or another state variable. 
+
+Advanced Features
+-----------------------
+
+Inputs
+^^^^^^^^^^^^^^^^
+The `jitcdde` backend supports several representations of input. Users are referred to the 
+`jitcdde documentation <https://jitcdde.readthedocs.io/en/stable/>`_ for more detail. An example file can be found 
+`here <https://github.com/neurophysik/jitcdde/blob/master/examples/mackey_glass_parameter_jump.py>`_. `jitcdde`-compatible representations of input
+can be given as arguments to the helper functions of `msrDynamics.Node`
+
+Trip Conditions
+^^^^^^^^^^^^^^^^
+The user can impose operating limits on the state variables using `msrDynamics.TripCondition`. When trip conditions are added to the 
+system, integration will stop when the condition is reached, and the time at which the condition is reached will be estimated with a cubic 
+interpolation of the anchor points closest to the trip time. 
+
+PID Control 
+^^^^^^^^^^^^^^^^
+The ``TripCondition`` class enables users to define conditions under which the system should halt or change behavior. For example, a trip condition can be set to stop the simulation if a temperature exceeds a certain threshold.
+
+Equilibrium Search
+^^^^^^^^^^^^^^^^^^
+
 
 
 API Reference

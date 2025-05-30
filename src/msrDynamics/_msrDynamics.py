@@ -724,16 +724,15 @@ class Node:
             self.dcdt = 0.0
             source = n * beta / Lambda
             decay = lam * self.y()
-            if flow and force_steady_state:
+            if flow:
                 outflow = self.y() / t_c
-                inflow = self.y(t - t_l) * sp.exp(-lam * t_l) / t_c
-                self.dcdt = source - decay - outflow + inflow
-            elif flow and (not force_steady_state):
-                outflow = self.y() / t_c
-                inflow = (self.y() / t_c) * (1 - sp.exp(-lam * t_l) / t_c)
-                self.dcdt = source - decay - outflow + inflow
+                if force_steady_state:
+                    inflow = self.y() * np.exp(-lam * t_l) / t_c
+                else:
+                    inflow = self.y(t - t_l) * np.exp(-lam * t_l) / t_c
             else:
-                self.dcdt = source - decay
+                inflow, outflow = 0.0, 0.0
+            self.dcdt = source - decay - outflow + inflow
         else:
             raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
 
