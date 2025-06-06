@@ -188,7 +188,12 @@ interpolation of the anchor points closest to the trip time.
 
 PID Control 
 ^^^^^^^^^^^^^^^^
-The ``TripCondition`` class enables users to define conditions under which the system should halt or change behavior. For example, a trip condition can be set to stop the simulation if a temperature exceeds a certain threshold.
+The ``msrDynamics.PID_loop`` class allows users to create objects which implement PID control logic compatible with the
+``jitcdde`` backend. The object takes the PID control parameters, along with the state variable associated with the 
+setpoint, and returns a callable function which can be used as an input variable in symbolic expressions, or in the 
+``msrDyanamics.Node`` helper functions. The PID loop can be used to control the temperature of a node, for example, 
+by setting the setpoint to the desired temperature, and the state variable to the temperature of the node. 
+The PID loop will then return the control signal which can be used as an input to the node's dynamics.
 
 Equilibrium Search
 ^^^^^^^^^^^^^^^^^^

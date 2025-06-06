@@ -197,13 +197,3 @@ class PID_loop:
                 return pid_func
             
         self.output_func = output_func(self)
-
-    # @output_func.setter
-    # def output_func(self, custom_output_func):
-    #     """
-    #     Sets a custom function for the PID output logic.
-
-    #     Args:
-    #         custom_output_func (callable): Custom PID logic function.
-    #     """
-    #     self._output_func = custom_output_func
