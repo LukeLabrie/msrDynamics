@@ -450,7 +450,7 @@ class System:
                 diff = np.linalg.norm(y[-1]-y0, ord = norm)
             else:
                 diff = np.linalg.norm(y[-1]-y[-2], ord = norm)
-            tol = abs_tol_eq + rel_tol_eq*np.linalg.norm(y[-1], ord = norm)
+            tol = abs_tol_eq + rel_tol_eq*diff
             iters += 1
 
         if show_conv_metrics:
@@ -691,7 +691,8 @@ class Node:
                  flow: bool = False, 
                  t_c: float = 0.0, 
                  t_l: float = 0.0,
-                 force_steady_state: bool = False):
+                 force_steady_state: bool = False,
+                 max_delay: float = 1e10):
         """
         Set the rate of change of precursor concentration.
 
@@ -725,11 +726,12 @@ class Node:
             source = n * beta / Lambda
             decay = lam * self.y()
             if flow:
+                t_l = sp.Min(max_delay, t_l)
                 outflow = self.y() / t_c
                 if force_steady_state:
-                    inflow = self.y() * np.exp(-lam * t_l) / t_c
+                    inflow = self.y() * sp.exp(-lam * t_l) / t_c
                 else:
-                    inflow = self.y(t - t_l) * np.exp(-lam * t_l) / t_c
+                    inflow = self.y(t - t_l) * sp.exp(-lam * t_l) / t_c
             else:
                 inflow, outflow = 0.0, 0.0
             self.dcdt = source - decay - outflow + inflow
