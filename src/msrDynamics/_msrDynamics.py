@@ -113,6 +113,8 @@ class System:
                         s = chspy.interpolate(time - trip_obj.delay, idx, (a1,a2))
                     elif trip_obj.trip_type == 'diff':
                         s = chspy.interpolate_diff(time - trip_obj.delay, idx, (a1,a2))
+                    elif trip_obj.trip_type == 'diff_rel':
+                        s = chspy.interpolate_diff(time - trip_obj.delay, idx, (a1,a2))/chspy.interpolate(time - trip_obj.delay, idx, (a1,a2))
                     else:
                         raise ValueError('''Invalid trip type. Currently supported 
                                             are 'state' and 'diff'.''')
