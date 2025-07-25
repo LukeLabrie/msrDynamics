@@ -379,6 +379,7 @@ class System:
                     self.trip_info['limit'] = tripped[1]
                     self.trip_info['type'] = trip_obj.trip_type
                     self.trip_info['t_last'] = t_x
+                    self.trip_info['name'] = trip_obj.name
 
                     # get system spline
                     print('getting state...')
@@ -387,10 +388,26 @@ class System:
                     # calculate exact trip time using splines 
                     print('computing trip time within interval...')
                     trip_sol = []
-                    solve_diff = True if self.trip_info['type'] == 'diff' else False
-                    trip_sol = state.solve(self.trip_info['idx'],
-                                           self.trip_info['limit'],
-                                           solve_derivative = solve_diff)
+                    if self.trip_info['type'] == 'diff_rel':
+                        # set up new spline for fractional derivative and interpolate
+                        times_dr = np.array([s.time for s in state])
+                        states_dr = np.array([s.diff[self.trip_info['idx']]/s.state[self.trip_info['idx']] for s in state])
+                        deriv_dr = np.diff(states_dr)/np.diff(times_dr)
+                        anchors_dr = []
+                        for i in range(len(states_dr)):
+                            # deriv vector will be one shorter, assume we're more interested in the end than the start
+                            if i == 0:
+                                anchor_dr = chspy.Anchor(times_dr[i], states_dr[i], 0.0) 
+                            else:
+                                anchor_dr = chspy.Anchor(times_dr[i], states_dr[i], deriv_dr[i-1])
+                            anchors_dr.append(anchor_dr)
+                        dr_spline = chspy.CubicHermiteSpline(n=1, anchors=anchors_dr)
+                        trip_sol = dr_spline.solve(0, self.trip_info['limit'], solve_derivative = False)
+                    else:
+                        solve_diff = True if self.trip_info['type'] == 'diff' else False
+                        trip_sol = state.solve(self.trip_info['idx'],
+                                            self.trip_info['limit'],
+                                            solve_derivative = solve_diff)
                     if trip_obj.delay:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
