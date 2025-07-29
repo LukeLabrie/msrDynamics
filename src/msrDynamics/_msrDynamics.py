@@ -1,4 +1,4 @@
-from jitcdde import jitcdde, y, t, jitcdde_input, input
+from jitcdde import jitcdde, y, t, jitcdde_input, input, current_y
 import numpy as np
 import chspy
 import sympy as sp
@@ -7,6 +7,9 @@ from tqdm import tqdm
 from symengine import Mul
 import sys
 import gc
+from symengine import lambdify
+import numpy as np
+import symengine as se
 
 MAX_INT = sys.maxsize
 
@@ -511,6 +514,59 @@ class System:
             ax.plot(times/fac, vals)
             return ax
 
+
+    def evaluate_expr(self, expr, t_array, y_array):
+        """
+        Evaluate a symbolic expression over time.
+        
+        Supports SymEngine expressions using current_y(i) by converting them to valid sympy Symbols.
+        
+        Parameters:
+            expr: symengine.Basic or str, the symbolic expression (e.g., from p['flows'])
+            t_array: (n,) array of times
+            y_array: (n, m) array where y[i, j] = current_y(j) at t[i]
+            
+        Returns:
+            (n,) array of evaluated values
+        """
+        # convert to sympy expression with current_y as a symbolic function
+        expr_str = str(expr)
+        t_sym = sp.Symbol("t")
+        current_y = sp.Function("current_y")
+        expr_sympy = sp.sympify(expr_str, locals={"current_y": current_y})
+
+        # replace current_y(i) → y_i
+        subs_map = {}
+        indices = []
+
+        for atom in expr_sympy.atoms(sp.Function):
+            if atom.func == current_y:
+                i = int(atom.args[0])
+                sym = sp.Symbol(f"y_{i}")
+                subs_map[atom] = sym
+                indices.append(i)
+
+        # apply the substitution
+        expr_sympy = expr_sympy.subs(subs_map)
+
+        # handle case: with or without current_y terms
+        if indices:
+            indices_sorted, symbols_sorted = zip(*sorted(zip(indices, subs_map.values()), key=lambda x: x[0]))
+            f = sp.lambdify([t_sym] + list(symbols_sorted), expr_sympy, modules=["numpy"])
+        else:
+            f = sp.lambdify([t_sym], expr_sympy, modules=["numpy"])
+
+        # evaluate expression over time
+        results = []
+        for i in range(len(t_array)):
+            if indices:
+                y_vals = y_array[i, indices_sorted]
+                args = [t_array[i]] + list(y_vals)
+            else:
+                args = [t_array[i]]
+            results.append(f(*args))
+
+        return np.array(results)
 
 class Node:
     """
