@@ -391,6 +391,10 @@ class System:
                     # calculate exact trip time using splines 
                     print('computing trip time within interval...')
                     trip_sol = []
+
+                    # bounds for inteprolation
+                    interp_start = times[0] + np.abs(trip_obj.check_after)
+                    interp_end = state[-1].time
                     if self.trip_info['type'] == 'diff_rel':
                         # set up new spline for fractional derivative and interpolate
                         times_dr = np.array([s.time for s in state])
@@ -405,18 +409,24 @@ class System:
                                 anchor_dr = chspy.Anchor(times_dr[i], states_dr[i], deriv_dr[i-1])
                             anchors_dr.append(anchor_dr)
                         dr_spline = chspy.CubicHermiteSpline(n=1, anchors=anchors_dr)
-                        trip_sol = dr_spline.solve(0, self.trip_info['limit'], solve_derivative = False)
+                        trip_sol = dr_spline.solve(0, 
+                                                   self.trip_info['limit'], 
+                                                   solve_derivative = False, 
+                                                   beginning = interp_start,
+                                                   end = interp_end)
                     else:
                         solve_diff = True if self.trip_info['type'] == 'diff' else False
                         trip_sol = state.solve(self.trip_info['idx'],
-                                            self.trip_info['limit'],
-                                            solve_derivative = solve_diff)
+                                               self.trip_info['limit'],
+                                               solve_derivative = solve_diff,
+                                               beginning = interp_start,
+                                               end = interp_end)
                     if trip_obj.delay:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
                         self.trip_info['time'] = trip_sol[0][0] 
                     print(f"tripped at t = {self.trip_info['time']:.3f}")
-                    print(f"state idx: {tripped[0]}")
+                    print(f"state idx: {self.trip_info['idx']}")
                     print(f"limit: {tripped[1]}")
                     break
         return np.array(y)
