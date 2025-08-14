@@ -393,7 +393,8 @@ class System:
                     trip_sol = []
 
                     # bounds for inteprolation
-                    interp_start = times[0] + np.abs(trip_obj.check_after)
+
+                    interp_start = times[0] + np.abs(trip_obj.check_after) if trip_obj.check_after else times[0]
                     interp_end = state[-1].time
                     if self.trip_info['type'] == 'diff_rel':
                         # set up new spline for fractional derivative and interpolate
