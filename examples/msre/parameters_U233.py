@@ -1,6 +1,9 @@
+'''
+These parameters were compiled by V. Singh et al for their paper: https://doi.org/10.1016/j.anucene.2017.10.047.
+Here they are translated to python syntax
+'''
+
 import numpy as np
-
-
 
 # domain
 t0 = 0.0

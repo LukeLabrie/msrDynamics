@@ -412,14 +412,11 @@ class System:
                                                    self.trip_info['limit'], 
                                                    solve_derivative = False,)
                     else:
-                        interp_start = times[0] + np.abs(trip_obj.check_after) if trip_obj.check_after else times[0]
-                        interp_end = state[-1].time
                         solve_diff = True if self.trip_info['type'] == 'diff' else False
                         trip_sol = state.solve(self.trip_info['idx'],
                                                self.trip_info['limit'],
                                                solve_derivative = solve_diff,
-                                               beginning = interp_start,
-                                               end = interp_end)
+                                               )
                     if trip_obj.delay:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
