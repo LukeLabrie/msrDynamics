@@ -85,6 +85,11 @@ class System:
     def y0(self):
         """list: List of intial conditions for each node."""
         return np.array([node.y0 for node in self.nodes.values()])
+    
+    @y0.setter
+    def y0(self, y0):
+        for idx, n in enumerate(self.nodes):
+            self.nodes[n].y0 = y0[idx]
 
     def _get_full_input(self, times):
         return [f(times) for f in self.input_funcs]
