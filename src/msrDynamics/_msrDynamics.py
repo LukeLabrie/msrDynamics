@@ -81,6 +81,11 @@ class System:
     def dydt(self, dydt):
         self._dydt = dydt
 
+    @property
+    def y0(self):
+        """list: List of intial conditions for each node."""
+        return np.array([node.y0 for node in self.nodes.values()])
+
     def _get_full_input(self, times):
         return [f(times) for f in self.input_funcs]
 
