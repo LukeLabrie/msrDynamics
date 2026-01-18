@@ -374,6 +374,7 @@ class System:
                 
                 if 'state' in self.trip_info:
                     self.trip_info['state'].extend([chspy.Anchor(t_x, states, derivs)])
+                    self.trip_info['state'].forget(self.max_delay)
                 else:
                     self.trip_info['state'] = chspy.CubicHermiteSpline(n=len(self.trip_conditions), 
                                                         anchors=[chspy.Anchor(t_x, states, derivs)])
