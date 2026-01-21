@@ -10,6 +10,7 @@ import gc
 from symengine import lambdify
 import numpy as np
 import symengine as se
+import os
 
 MAX_INT = sys.maxsize
 
@@ -208,6 +209,9 @@ class System:
         """
         # set up system matrix
         self.dydt = [n.dydt for n in self.nodes.values()]
+
+        # clang results in faster integration
+        os.environ["CC"] = "clang"
 
         # input uses different integrator object
         if self.input:
