@@ -11,6 +11,7 @@ from symengine import lambdify
 import numpy as np
 import symengine as se
 import os
+import scipy
 
 MAX_INT = sys.maxsize
 
@@ -436,7 +437,7 @@ class System:
                         self.trip_info['time'] = trip_sol[0][0] + trip_obj.delay
                     else:
                         self.trip_info['time'] = trip_sol[0][0] 
-                    print(f"tripped at t = {self.trip_info['time']:.3f}")
+                    print(f"tripped at t = {self.trip_info['time']:.6f}")
                     print(f"state idx: {self.trip_info['idx']}")
                     print(f"limit: {tripped[1]}")
                     break
@@ -588,6 +589,18 @@ class System:
             results.append(f(*args))
 
         return np.array(results)
+    
+    def get_state_sol(self):
+        '''
+        Unpack solution steps from the integrator
+        '''
+        if self.integrator is None:
+            raise ValueError('integrator is not set')
+        else:
+            state_obj = self.integrator.get_state()
+            state_sol = np.array([s.state for s in state_obj])
+            t_state = np.array([s.time for s in state_obj])
+            return t_state, state_sol
 
 class Node:
     """
@@ -622,32 +635,34 @@ class Node:
             W (float): Mass flow rate through the node in kilograms per second (kg/s).
             y0 (float): Initial temperature of the node in kelvin (K).
         """
-        self.name = name            # node name
-        self.m = m                  # mass (kg)
-        self.scp = scp              # specific heat capacity (J/(kg*°K))
-        self.W = W                  # mass flow rate (kg/s)
-        self.y0 = y0                # initial temperature (°K)
-        self.dTdt_advective = 0.0   # sym. expression for advective heat flow (°K/s)
-        self.dTdt_internal = 0.0    # sym. expression for internal heat generation (°K/s)
-        self.dTdt_convective = 0.0  # sym. expression for convective heat flow (°K/s)
-        self.dndt = 0.0             # sym. expression for dn/dt (n = neutron population)
-        self.dcdt = 0.0             # sym. expression for dc/dt (c = precursor concentration)
-        self.drdt = 0.0             # sym. expression for dr/dt (r = reactivity)
-        self.dndt_decay = 0.0       # syms expression for dn_d/dt (n_d = fractional decay generation)
-        self._dydt = 0.0            # sym. expression for user-defined dynamics 
-        self.y = None               # JiTCDDE state variable object, to be assigned by System
-        self.index = None           # JiTCDDE state variable index, to be assigned by System
-        self.y_out = np.array([])   # solution data, to be populated by System
-        self._linked_nodes = []     # list of linked nodes
-        self._dydt_linked = 0.0     # sym. expressions for linked nodes
-        self.in_system = False      # flag to check if node has been added to system
+        self.name = name               # node name
+        self.m = m                     # mass (kg)
+        self.scp = scp                 # specific heat capacity (J/(kg*°K))
+        self.W = W                     # mass flow rate (kg/s)
+        self.y0 = y0                   # initial temperature (°K)
+        self.dTdt_advective = 0.0      # sym. expression for advective heat flow (°K/s)
+        self.dTdt_internal = 0.0       # sym. expression for internal heat generation (°K/s)
+        self.dTdt_convective = 0.0     # sym. expression for convective heat flow (°K/s)
+        self.dndt = 0.0                # sym. expression for dn/dt (n = neutron population)
+        self.dcdt = 0.0                # sym. expression for dc/dt (c = precursor concentration)
+        self.drdt = 0.0                # sym. expression for dr/dt (r = reactivity)
+        self.dndt_decay = 0.0          # syms expression for dn_d/dt (n_d = fractional decay generation)
+        self._dydt = 0.0               # sym. expression for user-defined dynamics 
+        self.y = None                  # JiTCDDE state variable object, to be assigned by System
+        self.index = None              # JiTCDDE state variable index, to be assigned by System
+        self.y_out = np.array([])      # solution data, to be populated by System
+        self._linked_nodes = []        # list of linked nodes
+        self._dydt_linked = 0.0        # sym. expressions for linked nodes
+        self.in_system = False         # flag to check if node has been added to system
+        self.dTdt_radiative_loss = 0.0 # sym. expression for radiative heat loss (°K/s)
 
     @property
     def dydt(self):
         """float: Symbolic expression for the rate of change of state variables."""
         return self.dTdt_advective + self.dTdt_internal + \
                self.dTdt_convective + self.dndt + self.dcdt + self.drdt + \
-               self._dydt + self.dndt_decay + self.dydt_linked
+               self._dydt + self.dndt_decay + self.dydt_linked + \
+                self.dTdt_radiative_loss
 
     @dydt.setter
     def dydt(self, custom_dydt):
@@ -895,5 +910,16 @@ class Node:
         for coeff, n in self._linked_nodes:
             self._dydt_linked += (coeff*n.dydt)
         return self._dydt_linked
-        
+    
+    def set_dTdt_radiative_loss(self, k, T_env):
+        '''
+        Set a radiative loss to an environment at T_env. 
 
+        :param k: Proportionaliy constant, usually epsilon*sigma*A
+        :param T_env: Node or float representing the temperature of the 
+                      environment
+        '''
+        if self.y:
+            self.dTdt_radiative_loss = -k*((self.y() + 273)**4 - (T_env + 273)**4)/(self.m * self.scp)
+        else:
+            raise ValueError("Nodes need to be added to a System() object before setting dynamics.")
